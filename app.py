@@ -6,7 +6,7 @@ from openpyxl.styles import PatternFill, Font, Alignment
 from io import BytesIO
 
 # ================== كلمة المرور ==================
-PASSWORD = "m7md3mara2592025"
+PASSWORD = "2468"
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -58,7 +58,12 @@ else:
                 for cell in row:
                     if isinstance(cell.value, str) and cell.value.startswith("http"):
                         url = cell.value
-                        cell.value = "فتح الرابط"
+                        if "google.com/maps" in url:
+                            cell.value = "map"
+                        elif "imei.info" in url:
+                            cell.value = "check info"
+                        else:
+                            cell.value = "link"
                         cell.hyperlink = url
                         cell.font = green_link_font
 
