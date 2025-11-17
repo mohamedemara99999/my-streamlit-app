@@ -38,25 +38,30 @@ else:
             st.error(f"خطأ في فتح الملف: {e}")
 
     # ================== دوال التنسيق ==================
-    def format_excel_sheets(output_file, sheet_info):
+    def format_excel_sheets(output_file):
         wb = load_workbook(output_file)
-        for sheet_name, hyperlink_col in sheet_info:
-            ws = wb[sheet_name]
-            header_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-            header_font = Font(bold=True, color="FFFFFF", size=14)
+
+        header_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=14)
+        green_link_font = Font(color="006400", underline="single")
+
+        for ws in wb.worksheets:
+
+            # *********** تلوين رؤوس الأعمدة ***********
             for cell in ws[1]:
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = Alignment(horizontal="center")
-            for row in ws.iter_rows(min_row=2, min_col=1, max_col=ws.max_column, max_row=ws.max_row):
+
+            # *********** تحويل الروابط إلى Hyperlinks ***********
+            for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
                 for cell in row:
-                    cell.font = Font(size=12)
-                    cell.alignment = Alignment(horizontal="left")
-            if hyperlink_col:
-                for row in ws.iter_rows(min_row=2, min_col=hyperlink_col, max_col=hyperlink_col):
-                    for cell in row:
-                        if cell.value:
-                            cell.font = Font(color="006400", size=12)
+                    if isinstance(cell.value, str) and cell.value.startswith("http"):
+                        url = cell.value
+                        cell.value = "فتح الرابط"
+                        cell.hyperlink = url
+                        cell.font = green_link_font
+
         wb.save(output_file)
 
     # ================== تقرير اتصالات ==================
@@ -140,6 +145,10 @@ else:
             imei_summary.to_excel(writer, sheet_name="imei", index=False)
             site_group.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
+
+        # ************************ تطبيق التنسيق ************************
+        format_excel_sheets(output)
+
         return output
 
     # ================== تقرير فودافون ==================
@@ -209,6 +218,10 @@ else:
             imei_group.to_excel(writer, sheet_name="imei", index=False)
             site_group.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
+
+        # ************************ تطبيق التنسيق ************************
+        format_excel_sheets(output)
+
         return output
 
     # ================== أزرار التحليل ==================
