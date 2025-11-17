@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import os
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from io import BytesIO
@@ -26,34 +25,32 @@ else:
 
     uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx","xls"])
     current_df = None
-    current_file_name = None
 
     if uploaded_file is not None:
         try:
             current_df = pd.read_excel(uploaded_file, engine="openpyxl")
-            current_file_name = uploaded_file.name
-            st.success(f"تم فتح الملف: {current_file_name}")
+            st.success(f"تم فتح الملف: {uploaded_file.name}")
             st.dataframe(current_df)
         except Exception as e:
             st.error(f"خطأ في فتح الملف: {e}")
 
     # ================== دوال التنسيق ==================
-    def format_excel_sheets(output_file):
-        wb = load_workbook(output_file)
+    def format_excel_sheets(output):
+        output.seek(0)
+        wb = load_workbook(output)
 
         header_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF", size=14)
         green_link_font = Font(color="006400", underline="single")
 
         for ws in wb.worksheets:
-
-            # *********** تلوين رؤوس الأعمدة ***********
+            # رؤوس الأعمدة
             for cell in ws[1]:
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = Alignment(horizontal="center")
-
-            # *********** تحويل الروابط إلى Hyperlinks ***********
+            
+            # تحويل الروابط لكلمة map أو check info
             for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
                 for cell in row:
                     if isinstance(cell.value, str) and cell.value.startswith("http"):
@@ -62,18 +59,19 @@ else:
                             cell.value = "map"
                         elif "imei.info" in url:
                             cell.value = "check info"
-                        else:
-                            cell.value = "link"
                         cell.hyperlink = url
                         cell.font = green_link_font
 
-        wb.save(output_file)
+        final_output = BytesIO()
+        wb.save(final_output)
+        final_output.seek(0)
+        return final_output
 
     # ================== تقرير اتصالات ==================
     def generate_etisalat_report(df):
         required_cols = [
-            'Originating_Number', 'Terminating_Number', 'Network_Activity_Type_Name',
-            'Call_Start_Date','B_Number_Full_Name', 'B_Number_Address',
+            'Originating_Number','Terminating_Number','Network_Activity_Type_Name',
+            'Call_Start_Date','B_Number_Full_Name','B_Number_Address',
             'B_Number_MU_Site_Address','B_Number_MU_Latitude','B_Number_MU_Longitude',
             'IMEI_Number','Site_Address','Latitude','Longitude'
         ]
@@ -143,7 +141,7 @@ else:
         site_group = site_group.sort_values(by='Count', ascending=False)
         site_group = site_group[['Site_Address','Count','Map','First_Use_Date','Last_Use_Date']]
 
-        # حفظ كـ BytesIO
+        # حفظ Excel
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, sheet_name="calls", index=False)
@@ -151,10 +149,9 @@ else:
             site_group.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
 
-        # ************************ تطبيق التنسيق ************************
-        format_excel_sheets(output)
-
-        return output
+        # تطبيق التنسيقات والهايبرلينك
+        final_output = format_excel_sheets(output)
+        return final_output
 
     # ================== تقرير فودافون ==================
     def generate_vodafone_report(df):
@@ -217,6 +214,7 @@ else:
         site_group = site_group.sort_values(by='Count', ascending=False)
         site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
 
+        # حفظ Excel
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, sheet_name="calls", index=False)
@@ -224,10 +222,9 @@ else:
             site_group.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
 
-        # ************************ تطبيق التنسيق ************************
-        format_excel_sheets(output)
-
-        return output
+        # تطبيق التنسيقات والهايبرلينك
+        final_output = format_excel_sheets(output)
+        return final_output
 
     # ================== أزرار التحليل ==================
     if current_df is not None:
