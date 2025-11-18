@@ -47,13 +47,16 @@ else:
                 cell.font = Font(bold=True, color="FFFFFF", size=14)
                 cell.alignment = Alignment(horizontal="center")
             # الروابط
-            for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-                for cell in row:
-                    if isinstance(cell.value, str) and (cell.value.startswith("http") or cell.value.startswith("=HYPERLINK")):
-                        # ضع النص "هايبر لينك" مع الحفاظ على الرابط الفعلي
-                        cell.hyperlink = cell.value if not cell.value.startswith("=HYPERLINK") else None
-                        cell.value = "هايبر لينك"
-                        cell.font = green_link_font
+           for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+             for cell in row:
+                if isinstance(cell.value, str) and (cell.value.startswith("http") or cell.value.startswith("=HYPERLINK")):
+                    cell.hyperlink = cell.value if not cell.value.startswith("=HYPERLINK") else None
+                    # إذا الرابط خرائط ضع "Map"، إذا imei ضع "Check Info"
+                    if "google.com/maps" in cell.value:
+                        cell.value = "Map"
+                    else:
+                        cell.value = "Check Info"
+                    cell.font = link_font
         final_output = BytesIO()
         wb.save(final_output)
         final_output.seek(0)
@@ -324,3 +327,4 @@ else:
                         file_name="orange_report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
+
