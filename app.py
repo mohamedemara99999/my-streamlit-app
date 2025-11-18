@@ -10,7 +10,7 @@ PASSWORD = "13579"
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-# ================== صفحة تسجيل الدخول ==================
+# صفحة تسجيل الدخول
 if not st.session_state.logged_in:
     st.title("تسجيل الدخول")
     password_input = st.text_input("ادخل كلمة المرور", type="password")
@@ -21,7 +21,7 @@ if not st.session_state.logged_in:
         else:
             st.error("كلمة المرور غير صحيحة")
 else:
-    st.title("📊 Excel Analyzer Tool - Streamlit")
+    st.title("Excel Analyzer Tool - Streamlit")
 
     uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx","xls"])
     current_df = None
@@ -35,48 +35,42 @@ else:
             st.error(f"خطأ في فتح الملف: {e}")
 
     # ================== دوال التنسيق ==================
-    def format_excel_sheets(output, hyperlink_cols=None, header_colors=None, imei_hyper_cols=None):
+    def format_excel_sheets(output, header_colors=None):
         output.seek(0)
         wb = load_workbook(output)
-        hyperlink_cols = hyperlink_cols or {}
-        header_colors = header_colors or {}
-        imei_hyper_cols = imei_hyper_cols or {}
+
+        if header_colors is None:
+            header_colors = {}
+
+        green_link_font = Font(color="006400", underline="single")
 
         for ws in wb.worksheets:
-            # ===== تنسيق رؤوس الأعمدة =====
-            color = header_colors.get(ws.title, "228B22")
-            header_fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+            header_color = header_colors.get(ws.title, "FF0000")
+            header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
             header_font = Font(bold=True, color="FFFFFF", size=14)
+
+            # رؤوس الأعمدة
             for cell in ws[1]:
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = Alignment(horizontal="center")
 
-            # ===== تنسيق الصفوف =====
+            # باقي الصفوف
             for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
                 for cell in row:
-                    cell.font = Font(size=12)
                     cell.alignment = Alignment(horizontal="left")
-
-            # ===== هايبرلينك للخريطة =====
-            if ws.title in hyperlink_cols:
-                col_idx = hyperlink_cols[ws.title]
-                for r in range(2, ws.max_row + 1):
-                    cell = ws.cell(row=r, column=col_idx)
-                    if cell.value:
-                        cell.hyperlink = cell.value
-                        cell.value = "Map" if "google.com/maps" in cell.value else "check info"
-                        cell.font = Font(color="006400", underline="single")
-
-            # ===== هايبرلينك للـ IMEI =====
-            if ws.title in imei_hyper_cols:
-                col_idx = imei_hyper_cols[ws.title]
-                for r in range(2, ws.max_row + 1):
-                    cell = ws.cell(row=r, column=col_idx)
-                    if cell.value:
-                        cell.hyperlink = cell.value
-                        cell.value = "IMEI Info"
-                        cell.font = Font(color="006400", underline="single")
+                    cell.font = Font(size=12)
+                    # تحويل الرابط لكلمة map أو check info مع حماية NaN
+                    if isinstance(cell.value, str) and cell.value.startswith("http"):
+                        try:
+                            cell.hyperlink = str(cell.value)
+                            if "google.com/maps" in cell.value:
+                                cell.value = "map"
+                            elif "imei.info" in cell.value:
+                                cell.value = "check info"
+                            cell.font = green_link_font
+                        except:
+                            pass  # لو القيمة غير صالحة يتجاهل
 
         final_output = BytesIO()
         wb.save(final_output)
@@ -105,9 +99,11 @@ else:
                 'B_Number_MU_Site_Address','B_Number_MU_Latitude','B_Number_MU_Longitude']].drop_duplicates(subset='Originating_Number'),
             left_on='B Number', right_on='Originating_Number', how='left'
         )
+
         df_final = df_final[['B Number','Count','B_Number_Full_Name','B_Number_Address',
-                             'B_Number_MU_Site_Address','B_Number_MU_Latitude','B_Number_MU_Longitude']]
-        df_final.columns = ['B Number','Count','B Full Name','B Address','B_NUMBER_SITE_ADDRESS','Latitude','Longitude']
+                            'B_Number_MU_Site_Address','B_Number_MU_Latitude','B_Number_MU_Longitude']]
+        df_final.columns = ['B Number','Count','B Full Name','B Address',
+                            'B_NUMBER_SITE_ADDRESS','Latitude','Longitude']
 
         df_final['Map'] = df_final.apply(
             lambda row: f'https://www.google.com/maps/search/?api=1&query={row["Latitude"]},{row["Longitude"]}'
@@ -163,12 +159,8 @@ else:
             site_group.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
 
-        final_output = format_excel_sheets(
-            output,
-            hyperlink_cols={'calls':8,'site':3},
-            imei_hyper_cols={'imei':3},
-            header_colors={'calls':'228B22','imei':'228B22','site':'228B22'}
-        )
+        # تطبيق التنسيقات والهايبرلينك
+        final_output = format_excel_sheets(output, header_colors={'calls':'228B22','imei':'228B22','site':'228B22'})
         return final_output
 
     # ================== تقرير فودافون ==================
@@ -200,10 +192,9 @@ else:
         df_final = df_final.sort_values(by='Count', ascending=False)
 
         df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
-        df2['IMEI'] = df2['IMEI'].astype(str)
         imei_group = df2.groupby('IMEI').agg(
             Count=('IMEI','count'),
-            Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}'),
+            Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}' if pd.notna(x.iloc[0]) else ''),
             HANDSET_MANUFACTURER=('HANDSET_MANUFACTURER','first'),
             HANDSET_MARKETING_NAME=('HANDSET_MARKETING_NAME','first'),
             First_Use_Date=('FULL_DATE','min'),
@@ -217,6 +208,7 @@ else:
             first_last_addr.append((first_addr,last_addr))
         imei_group['First_Use_Address'] = [x[0] for x in first_last_addr]
         imei_group['Last_Use_Address'] = [x[1] for x in first_last_addr]
+
         imei_group = imei_group[['IMEI','Count','Device_Info','HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME',
                                  'First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
         imei_group['Count'] = imei_group['Count'].astype(int)
@@ -225,7 +217,7 @@ else:
         site_df = df2[['SITE_ADDRESS','LATITUDE','LONGITUDE','FULL_DATE']].copy()
         site_group = site_df.groupby('SITE_ADDRESS').agg(
             Count=('SITE_ADDRESS','count'),
-            Map=('LATITUDE', lambda x: f'https://www.google.com/maps/search/?api=1&query={x.iloc[0]},{site_df.loc[x.index[0],"LONGITUDE"]}'),
+            Map=('LATITUDE', lambda x: f'https://www.google.com/maps/search/?api=1&query={x.iloc[0]},{site_df.loc[x.index[0],"LONGITUDE"]}' if pd.notna(x.iloc[0]) else ''),
             First_Use_Date=('FULL_DATE','min'),
             Last_Use_Date=('FULL_DATE','max')
         ).reset_index()
@@ -233,6 +225,7 @@ else:
         site_group = site_group.sort_values(by='Count', ascending=False)
         site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
 
+        # حفظ Excel
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, sheet_name="calls", index=False)
@@ -240,20 +233,19 @@ else:
             site_group.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
 
-        final_output = format_excel_sheets(
-            output,
-            hyperlink_cols={'calls':6,'site':3},
-            imei_hyper_cols={'imei':3},
-            header_colors={'calls':'FF0000','imei':'FF0000','site':'FF0000'}
-        )
+        final_output = format_excel_sheets(output, header_colors={'calls':'FF0000','imei':'FF0000','site':'FF0000'})
         return final_output
 
     # ================== تقرير أورانج ==================
     def generate_orange_report(df):
+        if df is None:
+            st.error("افتح ملف Excel أولاً")
+            return None
+
         try:
-            df_orange = pd.read_excel(uploaded_file, engine="openpyxl", header=4)
+            df_orange = pd.read_excel(uploaded_file, engine="openpyxl", header=4)  # يبدأ من الصف 5
         except Exception as e:
-            st.error(f"خطأ في قراءة ملف أورانج: {e}")
+            st.error(f"خطأ في قراءة الملف: {e}")
             return None
 
         required_cols = [
@@ -279,7 +271,6 @@ else:
         calls_df['SMS'] = calls_df['SMS'].fillna(0).astype(int)
         calls_df = calls_df[['B Number','Count','OTHER_NAME','OTHER_ADDRESS','OTHER_ID','SMS']]
         calls_df.columns = ['B Number','Count','B Full Name','B Address','B Number id','SMS']
-        calls_df['B Number'] = calls_df['B Number'].apply(str)
         calls_df['Count'] = calls_df['Count'].astype(int)
         calls_df = calls_df.sort_values(by='Count', ascending=False)
 
@@ -292,7 +283,7 @@ else:
             First_Use_Address=('CELL_ADDRESS','first'),
             Last_Use_Address=('CELL_ADDRESS','last')
         ).reset_index()
-        imei_group['Device Info'] = imei_group['TARGET_IMEI'].apply(lambda x: f'https://www.imei.info/calc/?imei={x}')
+        imei_group['Device Info'] = imei_group['TARGET_IMEI'].apply(lambda x: f'https://www.imei.info/calc/?imei={x}' if pd.notna(x) else '')
         imei_group = imei_group[['TARGET_IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
         imei_group.columns = ['IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']
         imei_group['Count'] = imei_group['Count'].astype(int)
@@ -305,23 +296,19 @@ else:
             LAT=('CELL_LAT','first'),
             LON=('CELL_LONG','first')
         ).reset_index()
-        site_df['Map'] = site_df.apply(lambda row: f'https://www.google.com/maps/search/?api=1&query={row["LAT"]},{row["LON"]}', axis=1)
+        site_df['Map'] = site_df.apply(lambda row: f'https://www.google.com/maps/search/?api=1&query={row["LAT"]},{row["LON"]}' if pd.notna(row["LAT"]) else '', axis=1)
         site_df = site_df[['CELL_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
         site_df = site_df.sort_values(by='Count', ascending=False)
 
+        # حفظ Excel
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            calls_df.to_excel(writer, sheet_name="calls", index=False, startrow=4, startcol=1)
+            calls_df.to_excel(writer, sheet_name="calls", index=False)
             imei_group.to_excel(writer, sheet_name="imei", index=False)
             site_df.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
 
-        final_output = format_excel_sheets(
-            output,
-            hyperlink_cols={'calls':6,'site':3},
-            imei_hyper_cols={'imei':4},
-            header_colors={'calls':'FF6600','imei':'FF6600','site':'FF6600'}
-        )
+        final_output = format_excel_sheets(output, header_colors={'calls':'FF6600','imei':'FF6600','site':'FF6600'})
         return final_output
 
     # ================== أزرار التحليل ==================
