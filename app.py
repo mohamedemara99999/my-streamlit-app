@@ -50,9 +50,10 @@ else:
             for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
                 for cell in row:
                     if isinstance(cell.value, str) and (cell.value.startswith("http") or cell.value.startswith("=HYPERLINK")):
-                    # ضع النص "هايبر لينك" ولكن اجعل الرابط فعلي
-                    cell.hyperlink = cell.value if not cell.value.startswith("=HYPERLINK") else None
-                    cell.value = "هايبر لينك"
+                        # ضع النص "هايبر لينك" مع الحفاظ على الرابط الفعلي
+                        cell.hyperlink = cell.value if not cell.value.startswith("=HYPERLINK") else None
+                        cell.value = "هايبر لينك"
+                        cell.font = green_link_font
         final_output = BytesIO()
         wb.save(final_output)
         final_output.seek(0)
@@ -60,7 +61,6 @@ else:
 
     # ================== تقرير اتصالات ==================
     def generate_etisalat_report(df):
-        # ================== الكود تمام كما هو ==================
         required_cols = [
             'Originating_Number','Terminating_Number','Network_Activity_Type_Name',
             'Call_Start_Date','B_Number_Full_Name','B_Number_Address',
@@ -131,7 +131,6 @@ else:
         site_group = site_group.sort_values(by='Count', ascending=False)
         site_group = site_group[['Site_Address','Count','Map','First_Use_Date','Last_Use_Date']]
 
-        # حفظ Excel
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, sheet_name="calls", index=False)
@@ -139,7 +138,6 @@ else:
             site_group.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
 
-        # تطبيق التنسيقات والهايبرلينك
         final_output = format_excel_sheets(output, header_colors={'calls':'228B22','imei':'228B22','site':'228B22'})
         return final_output
 
@@ -171,7 +169,6 @@ else:
         df_final['Count'] = df_final['Count'].astype(int)
         df_final = df_final.sort_values(by='Count', ascending=False)
 
-        # معالجة IMEI ليظهر أرقام صحيحة
         df2['IMEI'] = df2['IMEI'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
         df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
         imei_group = df2.groupby('IMEI').agg(
@@ -220,7 +217,6 @@ else:
         if df is None:
             st.error("افتح ملف أولاً")
             return None
-        # قراءة من الصف 5 والعمود B
         try:
             df_orange = pd.read_excel(uploaded_file, engine="openpyxl", header=4)
         except Exception as e:
@@ -328,4 +324,3 @@ else:
                         file_name="orange_report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
-
