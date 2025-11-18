@@ -38,7 +38,8 @@ else:
     def format_excel_sheets(output, header_colors):
         output.seek(0)
         wb = load_workbook(output)
-        green_link_font = Font(color="006400", underline="single")
+        link_font = Font(color="006400", underline="single")
+        
         for ws in wb.worksheets:
             # رؤوس الأعمدة
             color = header_colors.get(ws.title, "FF0000")
@@ -46,17 +47,19 @@ else:
                 cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
                 cell.font = Font(bold=True, color="FFFFFF", size=14)
                 cell.alignment = Alignment(horizontal="center")
+            
             # الروابط
-           for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-             for cell in row:
-                if isinstance(cell.value, str) and (cell.value.startswith("http") or cell.value.startswith("=HYPERLINK")):
-                    cell.hyperlink = cell.value if not cell.value.startswith("=HYPERLINK") else None
-                    # إذا الرابط خرائط ضع "Map"، إذا imei ضع "Check Info"
-                    if "google.com/maps" in cell.value:
-                        cell.value = "Map"
-                    else:
-                        cell.value = "Check Info"
-                    cell.font = link_font
+            for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+                for cell in row:
+                    if isinstance(cell.value, str) and (cell.value.startswith("http") or cell.value.startswith("=HYPERLINK")):
+                        cell.hyperlink = cell.value if not cell.value.startswith("=HYPERLINK") else None
+                        # إذا الرابط خرائط ضع "Map"، إذا imei ضع "Check Info"
+                        if "google.com/maps" in cell.value:
+                            cell.value = "Map"
+                        else:
+                            cell.value = "Check Info"
+                        cell.font = link_font
+
         final_output = BytesIO()
         wb.save(final_output)
         final_output.seek(0)
@@ -134,6 +137,7 @@ else:
         site_group = site_group.sort_values(by='Count', ascending=False)
         site_group = site_group[['Site_Address','Count','Map','First_Use_Date','Last_Use_Date']]
 
+        # حفظ Excel
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, sheet_name="calls", index=False)
@@ -141,6 +145,7 @@ else:
             site_group.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
 
+        # تطبيق التنسيقات والهايبرلينك
         final_output = format_excel_sheets(output, header_colors={'calls':'228B22','imei':'228B22','site':'228B22'})
         return final_output
 
@@ -172,6 +177,7 @@ else:
         df_final['Count'] = df_final['Count'].astype(int)
         df_final = df_final.sort_values(by='Count', ascending=False)
 
+        # معالجة IMEI ليظهر أرقام صحيحة
         df2['IMEI'] = df2['IMEI'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
         df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
         imei_group = df2.groupby('IMEI').agg(
@@ -327,4 +333,3 @@ else:
                         file_name="orange_report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
-
