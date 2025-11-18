@@ -192,14 +192,16 @@ else:
         df_final = df_final.sort_values(by='Count', ascending=False)
 
         df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
-        imei_group = df2.groupby('IMEI').agg(
-            Count=('IMEI','count'),
-            Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}' if pd.notna(x.iloc[0]) else ''),
-            HANDSET_MANUFACTURER=('HANDSET_MANUFACTURER','first'),
-            HANDSET_MARKETING_NAME=('HANDSET_MARKETING_NAME','first'),
-            First_Use_Date=('FULL_DATE','min'),
-            Last_Use_Date=('FULL_DATE','max')
-        ).reset_index()
+        df2['IMEI'] = df2['IMEI'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
+imei_group = df2.groupby('IMEI').agg(
+    Count=('IMEI','count'),
+    Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}' if x.iloc[0] != '' else ''),
+    HANDSET_MANUFACTURER=('HANDSET_MANUFACTURER','first'),
+    HANDSET_MARKETING_NAME=('HANDSET_MARKETING_NAME','first'),
+    First_Use_Date=('FULL_DATE','min'),
+    Last_Use_Date=('FULL_DATE','max')
+).reset_index()
+
         first_last_addr = []
         for imei in imei_group['IMEI']:
             sub = df2[df2['IMEI']==imei].sort_values('FULL_DATE')
@@ -345,3 +347,4 @@ else:
                         file_name="orange_report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
+
