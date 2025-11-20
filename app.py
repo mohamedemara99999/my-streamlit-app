@@ -5,7 +5,7 @@ from openpyxl.styles import PatternFill, Font, Alignment
 from io import BytesIO
 
 # ================== كلمة المرور ==================
-PASSWORD = "m7md3mara2592025"
+PASSWORD = "1234"
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -356,3 +356,4 @@ def generate_vodafone_report(df):
                         file_name="orange_report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
+
