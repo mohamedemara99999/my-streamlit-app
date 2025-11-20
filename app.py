@@ -323,36 +323,36 @@ def generate_vodafone_report(df):
         return final_output
 
 # ================== أزرار التحليل ==================
-    if current_df is not None:
-        st.subheader("توليد تقارير")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("تقرير اتصالات"):
-                output = generate_etisalat_report(current_df)
-                if output:
-                    st.download_button(
-                        label="تحميل تقرير اتصالات",
-                        data=output,
-                        file_name="etisalat_report.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-        with col2:
-            if st.button("تقرير فودافون"):
-                output = generate_vodafone_report(current_df)
-                if output:
-                    st.download_button(
-                        label="تحميل تقرير فودافون",
-                        data=output,
-                        file_name="vodafone_report.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-        with col3:
-            if st.button("تقرير أورانج"):
-                output = generate_orange_report(current_df)
-                if output:
-                    st.download_button(
-                        label="تحميل تقرير أورانج",
-                        data=output,
-                        file_name="orange_report.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+if current_df is not None:
+    st.subheader("توليد تقارير")
+    col1, col2, col3 = st.columns(3)  # ثلاثة أعمدة للتقارير الثلاثة
+    with col1:
+        if st.button("تقرير اتصالات"):
+            output = generate_etisalat_report(current_df)
+            if output:
+                st.download_button(
+                    label="تحميل تقرير اتصالات",
+                    data=output,
+                    file_name="etisalat_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+    with col2:
+        if st.button("تقرير فودافون"):
+            output = generate_vodafone_report(current_df)
+            if output:
+                st.download_button(
+                    label="تحميل تقرير فودافون",
+                    data=output,
+                    file_name="vodafone_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+    with col3:
+        if st.button("تقرير أورانج"):
+            output = generate_orange_report(current_df)
+            if output:
+                st.download_button(
+                    label="تحميل تقرير أورانج",
+                    data=output,
+                    file_name="orange_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
