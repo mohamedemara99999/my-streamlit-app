@@ -35,21 +35,25 @@ else:
         except Exception as e:
             st.error(f"خطأ في فتح الملف: {e}")
 
-    # ================== دوال تنسيق Excel ==================
-    def format_excel_sheets(output, header_color="FF0000"):
-        output.seek(0)
-        wb = load_workbook(output)
+# ================== دوال تنسيق Excel ==================
+def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
+    output.seek(0)
+    wb = load_workbook(output)
 
-        header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
-        header_font = Font(bold=True, color="FFFFFF", size=14)
-        green_link_font = Font(color="006400", underline="single")
-
-        for ws in wb.worksheets:
-            # رؤوس الأعمدة
-            for cell in ws[1]:
-                cell.fill = header_fill
-                cell.font = header_font
-                cell.alignment = Alignment(horizontal="center")
+    header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=14)
+    green_link_font = Font(color="006400", underline="single")
+    for ws in wb.worksheets:   # <- الآن داخل الدالة
+        # رؤوس الأعمدة
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+        
+        # تلوين الصف المستثنى
+        if highlight_row is not None:
+            for cell in ws[highlight_row]:
+                cell.fill = PatternFill(start_color=highlight_color, end_color=highlight_color, fill_type="solid")
 
             # تحويل الروابط لكلمة map أو check info
             for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
@@ -170,7 +174,7 @@ else:
                 site_group.to_excel(writer, sheet_name="site", index=False)
                 output.seek(0)
             # تطبيق التنسيقات والهايبرلينك
-            final_output = format_excel_sheets(output)
+            final_output = format_excel_sheets(output, header_color="228B22", highlight_row=2, highlight_color="FFFF00")
             return final_output
 
 # ================== تقرير فودافون ==================
