@@ -60,6 +60,7 @@ else:
                         elif "imei.info" in url:
                             cell.value = "check info"
                         cell.hyperlink = url
+                        cell.font = green_link_font
 
         final_output = BytesIO()
         wb.save(final_output)
