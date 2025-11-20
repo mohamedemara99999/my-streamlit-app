@@ -5,12 +5,12 @@ from openpyxl.styles import PatternFill, Font, Alignment
 from io import BytesIO
 
 # ================== كلمة المرور ==================
-PASSWORD = "m7md3mara2592025"
+PASSWORD = "1234"
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-# صفحة تسجيل الدخول
+# ================== صفحة تسجيل الدخول ==================
 if not st.session_state.logged_in:
     st.title("تسجيل الدخول")
     password_input = st.text_input("ادخل كلمة المرور", type="password")
@@ -20,10 +20,11 @@ if not st.session_state.logged_in:
             st.experimental_rerun()
         else:
             st.error("كلمة المرور غير صحيحة")
+
 else:
     st.title("Excel Analyzer Tool - Streamlit")
 
-    uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx","xls"])
+    uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
     current_df = None
 
     if uploaded_file is not None:
@@ -34,12 +35,12 @@ else:
         except Exception as e:
             st.error(f"خطأ في فتح الملف: {e}")
 
-    # ================== دوال التنسيق ==================
-    def format_excel_sheets(output):
+    # ================== دوال تنسيق Excel ==================
+    def format_excel_sheets(output, header_color="FF0000"):
         output.seek(0)
         wb = load_workbook(output)
 
-        header_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+        header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF", size=14)
         green_link_font = Font(color="006400", underline="single")
 
@@ -49,7 +50,7 @@ else:
                 cell.fill = header_fill
                 cell.font = header_font
                 cell.alignment = Alignment(horizontal="center")
-            
+
             # تحويل الروابط لكلمة map أو check info
             for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
                 for cell in row:
@@ -79,11 +80,10 @@ else:
             if col not in df.columns:
                 st.error(f"العمود {col} غير موجود في الملف")
                 return None
-            # ===== الأعمدة الجديدة المطلوبة للاستثناء =====
-            optional_cols = ['A_Number_Details_First_Name', 'A_Number_Details_Last_Name', 'ID_Num', 'MU_Site_Address']
-            for col in optional_cols:
-                if col not in df.columns:
-                    df[col] = ''
+        optional_cols = ['A_Number_Details_First_Name', 'A_Number_Details_Last_Name', 'ID_Num', 'MU_Site_Address']
+        for col in optional_cols:
+            if col not in df.columns:
+                df[col] = ''
 
         numbers = pd.concat([df['Originating_Number'], df['Terminating_Number']]).astype(str)
         freq = numbers.value_counts().reset_index()
@@ -93,11 +93,9 @@ else:
                 'B_Number_MU_Site_Address','B_Number_MU_Latitude','B_Number_MU_Longitude']].drop_duplicates(subset='Originating_Number'),
             left_on='B Number', right_on='Originating_Number', how='left'
         )
-
         df_final = df_final[['B Number','Count','B_Number_Full_Name','B_Number_Address',
-                            'B_Number_MU_Site_Address','B_Number_MU_Latitude','B_Number_MU_Longitude']]
-        df_final.columns = ['B Number','Count','B Full Name','B Address',
-                            'B_NUMBER_SITE_ADDRESS','Latitude','Longitude']
+                             'B_Number_MU_Site_Address','B_Number_MU_Latitude','B_Number_MU_Longitude']]
+        df_final.columns = ['B Number','Count','B Full Name','B Address','B_NUMBER_SITE_ADDRESS','Latitude','Longitude']
 
         df_final['Map'] = df_final.apply(
             lambda row: f'https://www.google.com/maps/search/?api=1&query={row["Latitude"]},{row["Longitude"]}'
@@ -113,15 +111,15 @@ else:
         df_final.drop(columns=['Originating_Number'], inplace=True)
         df_final['Count'] = df_final['Count'].astype(int)
         df_final = df_final.sort_values(by='Count', ascending=False)
-        # ===== استثناء الصف الثاني بعد الهيدر =====
+
         if len(df_final) >= 2:
-            second_row_index = df_final.index[1]  # الصف الثاني بعد الهيدر
+            second_row_index = df_final.index[1]
             second_b_number = df_final.at[second_row_index, 'B Number']
             df_match = df[df['Originating_Number'].astype(str) == second_b_number]
             if not df_match.empty:
                 df_final.at[second_row_index, 'B Full Name'] = (
                     str(df_match.iloc[0]['A_Number_Details_First_Name']) + " " + str(df_match.iloc[0]['A_Number_Details_Last_Name'])
-                    )
+                )
                 df_final.at[second_row_index, 'B Address'] = str(df_match.iloc[0]['ID_Num'])
                 df_final.at[second_row_index, 'B_NUMBER_SITE_ADDRESS'] = str(df_match.iloc[0]['MU_Site_Address'])
                 df_final.at[second_row_index, 'Latitude'] = ''
@@ -140,11 +138,8 @@ else:
             Last_Use_Address=('Site_Address','last')
         ).reset_index()
         imei_summary.rename(columns={'IMEI_Number':'IMEI'}, inplace=True)
-        imei_summary['Device Info'] = imei_summary['IMEI'].apply(
-            lambda x: f'https://www.imei.info/calc/?imei={x}'
-        )
-        imei_summary = imei_summary[['IMEI','Count','Device Info','First_Use_Date','Last_Use_Date',
-                                     'First_Use_Address','Last_Use_Address']]
+        imei_summary['Device Info'] = imei_summary['IMEI'].apply(lambda x: f'https://www.imei.info/calc/?imei={x}')
+        imei_summary = imei_summary[['IMEI','Count','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
         imei_summary['Count'] = imei_summary['Count'].astype(int)
         imei_summary = imei_summary.sort_values(by='Count', ascending=False)
 
@@ -160,7 +155,6 @@ else:
         site_group = site_group.sort_values(by='Count', ascending=False)
         site_group = site_group[['Site_Address','Count','Map','First_Use_Date','Last_Use_Date']]
 
-        # حفظ Excel
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, sheet_name="calls", index=False)
@@ -168,8 +162,7 @@ else:
             site_group.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
 
-        # تطبيق التنسيقات والهايبرلينك
-        final_output = format_excel_sheets(output)
+        final_output = format_excel_sheets(output, header_color="228B22")
         return final_output
 
     # ================== تقرير فودافون ==================
@@ -234,7 +227,6 @@ else:
         site_group = site_group.sort_values(by='Count', ascending=False)
         site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
 
-        # حفظ Excel
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, sheet_name="calls", index=False)
@@ -242,14 +234,82 @@ else:
             site_group.to_excel(writer, sheet_name="site", index=False)
         output.seek(0)
 
-        # تطبيق التنسيقات والهايبرلينك
-        final_output = format_excel_sheets(output)
+        final_output = format_excel_sheets(output, header_color="FF0000")
+        return final_output
+
+    # ================== تقرير أورانج ==================
+    def generate_orange_report(df):
+        required_cols = [
+            'TARGET_MSISDN','TARGET_IMEI','TARGET_IMSI','TARGET_IMEI_TYPE','EVENT_START_TIME',
+            'CALL_DURATION','EVENT_DIRECTION','OTHER_MSISDN','OTHER_NAME','OTHER_ID',
+            'OTHER_ID_TYPE','OTHER_ADDRESS','CELL_ADDRESS','CELL_LAT','CELL_LONG'
+        ]
+        for col in required_cols:
+            if col not in df.columns:
+                st.error(f"العمود {col} غير موجود في الملف")
+                return None
+
+        numbers = df['OTHER_MSISDN'].astype(str)
+        freq = numbers.value_counts().reset_index()
+        freq.columns = ['B Number','Count']
+
+        calls_df = freq.merge(
+            df[['OTHER_MSISDN','OTHER_NAME','OTHER_ADDRESS','OTHER_ID']].drop_duplicates(subset='OTHER_MSISDN'),
+            left_on='B Number', right_on='OTHER_MSISDN', how='left'
+        )
+
+        sms_count = df[df['EVENT_DIRECTION'].astype(str).str.strip()=="SMSMT"].groupby('OTHER_MSISDN').size().reset_index(name='SMS')
+        calls_df = calls_df.merge(sms_count, left_on='B Number', right_on='OTHER_MSISDN', how='left')
+        calls_df['SMS'] = calls_df['SMS'].fillna(0).astype(int)
+
+        calls_df = calls_df[['B Number','Count','OTHER_NAME','OTHER_ADDRESS','OTHER_ID','SMS']]
+        calls_df.columns = ['B Number','Count','B Full Name','B Address','B Number id','SMS']
+        calls_df['B Number'] = calls_df['B Number'].apply(str)
+        calls_df['B Number id'] = calls_df['B Number id'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
+        calls_df['Count'] = calls_df['Count'].astype(int)
+        calls_df = calls_df.sort_values(by='Count', ascending=False)
+
+        df['TARGET_IMEI'] = df['TARGET_IMEI'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
+        imei_group = df.groupby('TARGET_IMEI').agg(
+            Count=('TARGET_IMEI','count'),
+            TARGET_IMEI_TYPE=('TARGET_IMEI_TYPE','first'),
+            First_Use_Date=('EVENT_START_TIME','min'),
+            Last_Use_Date=('EVENT_START_TIME','max'),
+            First_Use_Address=('CELL_ADDRESS','first'),
+            Last_Use_Address=('CELL_ADDRESS','last')
+        ).reset_index()
+        imei_group['Device Info'] = imei_group['TARGET_IMEI'].apply(lambda x: f'https://www.imei.info/calc/?imei={x}')
+        imei_group = imei_group[['TARGET_IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
+        imei_group.columns = ['IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']
+        imei_group['Count'] = imei_group['Count'].astype(int)
+        imei_group = imei_group.sort_values(by='Count', ascending=False)
+
+        site_df = df.groupby('CELL_ADDRESS').agg(
+            Count=('CELL_ADDRESS','count'),
+            First_Use_Date=('EVENT_START_TIME','min'),
+            Last_Use_Date=('EVENT_START_TIME','max'),
+            LAT=('CELL_LAT','first'),
+            LON=('CELL_LONG','first')
+        ).reset_index()
+        site_df['Map'] = site_df.apply(lambda row: f'https://www.google.com/maps/search/?api=1&query={row["LAT"]},{row["LON"]}' 
+                                       if pd.notna(row["LAT"]) and pd.notna(row["LON"]) else '', axis=1)
+        site_df = site_df[['CELL_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
+        site_df = site_df.sort_values(by='Count', ascending=False)
+
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            calls_df.to_excel(writer, sheet_name="calls", index=False)
+            imei_group.to_excel(writer, sheet_name="imei", index=False)
+            site_df.to_excel(writer, sheet_name="site", index=False)
+        output.seek(0)
+
+        final_output = format_excel_sheets(output, header_color="FF6600")
         return final_output
 
     # ================== أزرار التحليل ==================
     if current_df is not None:
         st.subheader("توليد تقارير")
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("تقرير اتصالات"):
                 output = generate_etisalat_report(current_df)
@@ -268,5 +328,15 @@ else:
                         label="تحميل تقرير فودافون",
                         data=output,
                         file_name="vodafone_report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+        with col3:
+            if st.button("تقرير أورانج"):
+                output = generate_orange_report(current_df)
+                if output:
+                    st.download_button(
+                        label="تحميل تقرير أورانج",
+                        data=output,
+                        file_name="orange_report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
