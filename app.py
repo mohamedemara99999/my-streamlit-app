@@ -169,9 +169,9 @@ else:
                 imei_summary.to_excel(writer, sheet_name="imei", index=False)
                 site_group.to_excel(writer, sheet_name="site", index=False)
                 output.seek(0)
-                # تطبيق التنسيقات والهايبرلينك
-                final_output = format_excel_sheets(output)
-                return final_output
+            # تطبيق التنسيقات والهايبرلينك
+            final_output = format_excel_sheets(output)
+            return final_output
 
 # ================== تقرير فودافون ==================
 def generate_vodafone_report(df):
