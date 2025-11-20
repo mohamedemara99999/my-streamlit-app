@@ -322,7 +322,7 @@ def generate_vodafone_report(df):
         final_output = format_excel_sheets(output, header_color="FF6600")
         return final_output
 
-    # ================== أزرار التحليل ==================
+# ================== أزرار التحليل ==================
     if current_df is not None:
         st.subheader("توليد تقارير")
         col1, col2, col3 = st.columns(3)
