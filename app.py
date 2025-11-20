@@ -59,13 +59,12 @@ def format_excel_sheets(output, header_color="228B22", highlight_row=None, highl
                 for cell in row:
                     if isinstance(cell.value, str) and cell.value.startswith("http"):
                         url = cell.value
-                        if "google.com/maps" in url:
-                            cell.value = "map"
-                        elif "imei.info" in url:
-                            cell.value = "check info"
-                        cell.hyperlink = url
-                        cell.font = green_link_font
-
+                    if "google.com/maps" in url:
+                        cell.value = "map"
+                    elif "imei.info" in url:
+                        cell.value = "check info"
+                    cell.hyperlink = url
+                    cell.font = green_link_font
         final_output = BytesIO()
         wb.save(final_output)
         final_output.seek(0)
