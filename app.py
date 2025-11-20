@@ -68,7 +68,7 @@ else:
         final_output.seek(0)
         return final_output
 
-    # ================== تقرير اتصالات ==================
+# ================== تقرير اتصالات ==================
     def generate_etisalat_report(df):
         required_cols = [
             'Originating_Number','Terminating_Number','Network_Activity_Type_Name',
