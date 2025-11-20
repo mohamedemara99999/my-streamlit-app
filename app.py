@@ -5,7 +5,7 @@ from openpyxl.styles import PatternFill, Font, Alignment
 from io import BytesIO
 
 # ================== كلمة المرور ==================
-PASSWORD = "1234"
+PASSWORD = "m7md3mara2592025"
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -165,77 +165,93 @@ else:
         final_output = format_excel_sheets(output, header_color="228B22")
         return final_output
 
-    # ================== تقرير فودافون ==================
-    def generate_vodafone_report(df):
-        required_cols = [
-            'B_NUMBER','B_NUMBER_FIRST_NAME','B_NUMBER_LAST_NAME','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS',
-            'IMEI','HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME','FULL_DATE','SITE_ADDRESS','LATITUDE','LONGITUDE','SERVICE'
-        ]
-        for col in required_cols:
-            if col not in df.columns:
-                st.error(f"العمود {col} غير موجود في الملف")
-                return None
+# ================== تقرير فودافون ==================
+def generate_vodafone_report(df):
+    required_cols = [
+        'B_NUMBER','B_NUMBER_FIRST_NAME','B_NUMBER_LAST_NAME','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS',
+        'B_NUMBER_NATIONAL_ID','IMEI','HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME',
+        'FULL_DATE','SITE_ADDRESS','LATITUDE','LONGITUDE','SERVICE'
+    ]
+    for col in required_cols:
+        if col not in df.columns:
+            st.error(f"العمود {col} غير موجود في الملف")
+            return None
 
-        df2 = df.copy()
-        df2['B Full Name'] = df2['B_NUMBER_FIRST_NAME'].fillna('') + ' ' + df2['B_NUMBER_LAST_NAME'].fillna('')
-        numbers = df2['B_NUMBER'].astype(str)
-        freq = numbers.value_counts().reset_index()
-        freq.columns = ['B Number','Count']
+    df2 = df.copy()
+    df2['B Full Name'] = df2['B_NUMBER_FIRST_NAME'].fillna('') + ' ' + df2['B_NUMBER_LAST_NAME'].fillna('')
+    df2['IMEI'] = df2['IMEI'].astype(str)
+    numbers = df2['B_NUMBER'].astype(str)
+    freq = numbers.value_counts().reset_index()
+    freq.columns = ['B Number','Count']
 
-        sms_count = df[df['SERVICE'].astype(str).str.strip().isin(["Short message MO/PP","Short message MT/PP"])].groupby('B_NUMBER').size().reset_index(name='SMS')
+    # ===== حساب SMS =====
+    sms_count = df2[df2['SERVICE'].astype(str).str.strip().isin(["Short message MO/PP","Short message MT/PP"])].groupby('B_NUMBER').size().reset_index(name='SMS')
 
-        df_final = freq.merge(
-            df2[['B_NUMBER','B Full Name','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS']].drop_duplicates(subset='B_NUMBER'),
-            left_on='B Number', right_on='B_NUMBER', how='left'
-        )
-        df_final = df_final.merge(sms_count, left_on='B Number', right_on='B_NUMBER', how='left')
-        df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
-        df_final = df_final[['B Number','Count','B Full Name','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS']]
-        df_final['Count'] = df_final['Count'].astype(int)
-        df_final = df_final.sort_values(by='Count', ascending=False)
+    # ===== دمج البيانات =====
+    df_final = freq.merge(
+        df2[['B_NUMBER','B Full Name','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','B_NUMBER_NATIONAL_ID']].drop_duplicates(subset='B_NUMBER'),
+        left_on='B Number', right_on='B_NUMBER', how='left'
+    )
+    df_final = df_final.merge(sms_count, left_on='B Number', right_on='B_NUMBER', how='left')
+    df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
 
-        df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
-        imei_group = df2.groupby('IMEI').agg(
-            Count=('IMEI','count'),
-            Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}'),
-            HANDSET_MANUFACTURER=('HANDSET_MANUFACTURER','first'),
-            HANDSET_MARKETING_NAME=('HANDSET_MARKETING_NAME','first'),
-            First_Use_Date=('FULL_DATE','min'),
-            Last_Use_Date=('FULL_DATE','max')
-        ).reset_index()
-        first_last_addr = []
-        for imei in imei_group['IMEI']:
-            sub = df2[df2['IMEI']==imei].sort_values('FULL_DATE')
-            first_addr = sub.iloc[0]['SITE_ADDRESS']
-            last_addr = sub.iloc[-1]['SITE_ADDRESS']
-            first_last_addr.append((first_addr,last_addr))
-        imei_group['First_Use_Address'] = [x[0] for x in first_last_addr]
-        imei_group['Last_Use_Address'] = [x[1] for x in first_last_addr]
-        imei_group = imei_group[['IMEI','Count','Device_Info','HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME',
-                                 'First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
-        imei_group['Count'] = imei_group['Count'].astype(int)
-        imei_group = imei_group.sort_values(by='Count', ascending=False)
+    # ===== إضافة B Number id بعد B Full Name =====
+    df_final['B Number id'] = df_final['B_NUMBER_NATIONAL_ID'].astype(str)
 
-        site_df = df2[['SITE_ADDRESS','LATITUDE','LONGITUDE','FULL_DATE']].copy()
-        site_group = site_df.groupby('SITE_ADDRESS').agg(
-            Count=('SITE_ADDRESS','count'),
-            Map=('LATITUDE', lambda x: f'https://www.google.com/maps/search/?api=1&query={x.iloc[0]},{site_df.loc[x.index[0],"LONGITUDE"]}'),
-            First_Use_Date=('FULL_DATE','min'),
-            Last_Use_Date=('FULL_DATE','max')
-        ).reset_index()
-        site_group['Count'] = site_group['Count'].astype(int)
-        site_group = site_group.sort_values(by='Count', ascending=False)
-        site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
+    # ===== ترتيب الأعمدة النهائي =====
+    df_final = df_final[['B Number','Count','B Full Name','B Number id','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS']]
+    df_final['Count'] = df_final['Count'].astype(int)
+    df_final = df_final.sort_values(by='Count', ascending=False)
 
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df_final.to_excel(writer, sheet_name="calls", index=False)
-            imei_group.to_excel(writer, sheet_name="imei", index=False)
-            site_group.to_excel(writer, sheet_name="site", index=False)
-        output.seek(0)
+    # ===== تجميع بيانات IMEI =====
+    df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
+    imei_group = df2.groupby('IMEI').agg(
+        Count=('IMEI','count'),
+        Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}'),
+        HANDSET_MANUFACTURER=('HANDSET_MANUFACTURER','first'),
+        HANDSET_MARKETING_NAME=('HANDSET_MARKETING_NAME','first'),
+        First_Use_Date=('FULL_DATE','min'),
+        Last_Use_Date=('FULL_DATE','max')
+    ).reset_index()
 
-        final_output = format_excel_sheets(output, header_color="FF0000")
-        return final_output
+    # ===== أول وآخر عنوان لكل IMEI =====
+    first_last_addr = []
+    for imei in imei_group['IMEI']:
+        sub = df2[df2['IMEI']==imei].sort_values('FULL_DATE')
+        first_addr = sub.iloc[0]['SITE_ADDRESS']
+        last_addr = sub.iloc[-1]['SITE_ADDRESS']
+        first_last_addr.append((first_addr,last_addr))
+    imei_group['First_Use_Address'] = [x[0] for x in first_last_addr]
+    imei_group['Last_Use_Address'] = [x[1] for x in first_last_addr]
+
+    imei_group = imei_group[['IMEI','Count','Device_Info','HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME',
+                             'First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
+    imei_group['Count'] = imei_group['Count'].astype(int)
+    imei_group = imei_group.sort_values(by='Count', ascending=False)
+
+    # ===== تجميع بيانات المواقع =====
+    site_df = df2[['SITE_ADDRESS','LATITUDE','LONGITUDE','FULL_DATE']].copy()
+    site_group = site_df.groupby('SITE_ADDRESS').agg(
+        Count=('SITE_ADDRESS','count'),
+        Map=('LATITUDE', lambda x: f'https://www.google.com/maps/search/?api=1&query={x.iloc[0]},{site_df.loc[x.index[0],"LONGITUDE"]}'),
+        First_Use_Date=('FULL_DATE','min'),
+        Last_Use_Date=('FULL_DATE','max')
+    ).reset_index()
+    site_group['Count'] = site_group['Count'].astype(int)
+    site_group = site_group.sort_values(by='Count', ascending=False)
+    site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
+
+    # ===== حفظ Excel في BytesIO =====
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_final.to_excel(writer, sheet_name="calls", index=False)
+        imei_group.to_excel(writer, sheet_name="imei", index=False)
+        site_group.to_excel(writer, sheet_name="site", index=False)
+    output.seek(0)
+
+    # ===== تطبيق التنسيقات والهايبرلينك =====
+    final_output = format_excel_sheets(output, header_color="FF0000")
+    return final_output
 
     # ================== تقرير أورانج ==================
     def generate_orange_report(df):
