@@ -35,53 +35,38 @@ else:
         except Exception as e:
             st.error(f"خطأ في فتح الملف: {e}")
 
-# ================== دوال تنسيق Excel ==================
-from openpyxl import load_workbook
-from openpyxl.styles import PatternFill, Font, Alignment
-from io import BytesIO
+    # ================== دوال تنسيق Excel ==================
+    def format_excel_sheets(output, header_color="FF0000"):
+        output.seek(0)
+        wb = load_workbook(output)
 
-def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
-    """
-    تنسيق ملفات Excel:
-    - header_color: لون الهيدر
-    - highlight_row: رقم الصف المراد تلوينه (Excel index يبدأ من 1)
-    - highlight_color: لون الصف المستثنى
-    """
-    output.seek(0)
-    wb = load_workbook(output)
+        header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=14)
+        green_link_font = Font(color="006400", underline="single")
 
-    header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=14)
-    green_link_font = Font(color="006400", underline="single")
+        for ws in wb.worksheets:
+            # رؤوس الأعمدة
+            for cell in ws[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center")
 
-    for ws in wb.worksheets:
-        # تلوين الهيدر
-        for cell in ws[1]:
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = Alignment(horizontal="center")
+            # تحويل الروابط لكلمة map أو check info
+            for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+                for cell in row:
+                    if isinstance(cell.value, str) and cell.value.startswith("http"):
+                        url = cell.value
+                        if "google.com/maps" in url:
+                            cell.value = "map"
+                        elif "imei.info" in url:
+                            cell.value = "check info"
+                        cell.hyperlink = url
+                        cell.font = green_link_font
 
-        # تلوين الصف المستثنى أصفر
-        if highlight_row is not None:
-            for cell in ws[highlight_row]:
-                cell.fill = PatternFill(start_color=highlight_color, end_color=highlight_color, fill_type="solid")
-
-        # تحويل الروابط لكلمة map أو check info
-        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-            for cell in row:
-                if isinstance(cell.value, str) and cell.value.startswith("http"):
-                    url = cell.value
-                    if "google.com/maps" in url:
-                        cell.value = "map"
-                    elif "imei.info" in url:
-                        cell.value = "check info"
-                    cell.hyperlink = url
-                    cell.font = green_link_font
-
-    final_output = BytesIO()
-    wb.save(final_output)
-    final_output.seek(0)
-    return final_output
+        final_output = BytesIO()
+        wb.save(final_output)
+        final_output.seek(0)
+        return final_output
 
 # ================== تقرير اتصالات ==================
     def generate_etisalat_report(df):
