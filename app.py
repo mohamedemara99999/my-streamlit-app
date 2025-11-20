@@ -253,7 +253,7 @@ def generate_vodafone_report(df):
     final_output = format_excel_sheets(output, header_color="FF0000")
     return final_output
 
-    # ================== تقرير أورانج ==================
+# ================== تقرير أورانج ==================
     def generate_orange_report(df):
         required_cols = [
             'TARGET_MSISDN','TARGET_IMEI','TARGET_IMSI','TARGET_IMEI_TYPE','EVENT_START_TIME',
@@ -356,4 +356,3 @@ def generate_vodafone_report(df):
                         file_name="orange_report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
-
