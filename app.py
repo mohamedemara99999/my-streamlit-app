@@ -33,6 +33,7 @@ else:
         try:
             if selected_company == "orange":
                 current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
+                current_df.columns = current_df.columns.str.strip()
             else:
                 current_df = pd.read_excel(uploaded_file, engine="openpyxl")
 
@@ -389,6 +390,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
