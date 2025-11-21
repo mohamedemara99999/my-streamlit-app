@@ -1,5 +1,8 @@
 import streamlit as st
 import pandas as pd
+from io import BytesIO
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Font, Alignment
 
 # كلمة المرور
 PASSWORD = "1234"
@@ -20,31 +23,43 @@ else:
     st.title("Excel Analyzer Tool - Streamlit")
 
     # اختيار الشركة
-selected_company = st.selectbox(
-    "اختر الشركة",
-    ["etisalat", "vodafone", "orange"]
-)
+    selected_company = st.selectbox(
+        "اختر الشركة",
+        ["etisalat", "vodafone", "orange"]
+    )
 
-# رفع الملف
-uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
-current_df = None
+    # رفع الملف
+    uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
+    current_df = None
 
-if uploaded_file is not None:
-    try:
-        if selected_company == "orange":
-            # اقرأ كل الصفوف بدون هيدر
-            temp_df = pd.read_excel(uploaded_file, header=None, engine="openpyxl")
-            # افترض أن الصف الخامس هو الهيدر الحقيقي (index 4)
-            temp_df.columns = temp_df.iloc[4]  # الصف الخامس كعناوين
-        else:
-            current_df = temp_df.iloc[5:].reset_index(drop=True)
-            current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
-            current_df.columns = current_df.columns.str.strip()
-            st.write("عدد الصفوف بعد القراءة:", len(current_df))
-            st.dataframe(current_df.head(10))
+    if uploaded_file is not None:
+        try:
+            if selected_company == "orange":
+                # ===== قراءة الملف بدون هيدر أولاً =====
+                temp_df = pd.read_excel(uploaded_file, header=None, engine="openpyxl")
+                
+                # ===== الصف الخامس هو الهيدر الحقيقي =====
+                temp_df.columns = temp_df.iloc[4]  # الصف الخامس كعناوين
+                current_df = temp_df.iloc[5:].reset_index(drop=True)  # البيانات تبدأ بعد الصف الخامس
+                
+                # ===== تنظيف الأعمدة =====
+                current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
+                current_df.columns = current_df.columns.str.strip()  # إزالة الفراغات
+                
+                # ===== عرض البيانات للتأكد =====
+                st.write("عدد الصفوف بعد القراءة:", len(current_df))
+                st.dataframe(current_df.head(10))
 
-    except Exception as e:
-        st.error(f"خطأ في فتح الملف: {e}")
+            else:
+                # ملفات اتصالات وفودافون كما هي
+                current_df = pd.read_excel(uploaded_file, engine="openpyxl")
+                current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
+                current_df.columns = current_df.columns.str.strip()
+                st.write("عدد الصفوف بعد القراءة:", len(current_df))
+                st.dataframe(current_df.head(10))
+
+        except Exception as e:
+            st.error(f"خطأ في فتح الملف: {e}")
 
 # ================== دوال تنسيق Excel ==================
 def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
@@ -392,6 +407,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
