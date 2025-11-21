@@ -1,65 +1,43 @@
 import streamlit as st
 import pandas as pd
-from io import BytesIO
-from openpyxl import load_workbook
-from openpyxl.styles import PatternFill, Font, Alignment
 
-# كلمة المرور
-PASSWORD = "1234"
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+# صفحة اختيار الشركة ورفع الملف
+st.title("Excel Analyzer Tool - Streamlit")
 
-# صفحة تسجيل الدخول
-if not st.session_state.logged_in:
-    st.title("تسجيل الدخول")
-    password_input = st.text_input("ادخل كلمة المرور", type="password")
-    if st.button("دخول"):
-        if password_input == PASSWORD:
-            st.session_state.logged_in = True
-            st.experimental_rerun()
-        else:
-            st.error("كلمة المرور غير صحيحة")
-else:
-    st.title("Excel Analyzer Tool - Streamlit")
+selected_company = st.selectbox(
+    "اختر الشركة",
+    ["etisalat", "vodafone", "orange"]
+)
 
-    # اختيار الشركة
-    selected_company = st.selectbox(
-        "اختر الشركة",
-        ["etisalat", "vodafone", "orange"]
-    )
-
-    # رفع الملف
-    uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
-    current_df = None
+uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
+current_df = None
 
 if uploaded_file is not None:
     try:
+        # ===== قراءة الملف حسب الشركة =====
         if selected_company == "orange":
-            # ===== قراءة الملف بدون هيدر أولاً =====
-            temp_df = pd.read_excel(uploaded_file, header=None, engine="openpyxl")
-            # ===== حذف العمود الأول =====
-            temp_df = temp_df.drop(temp_df.columns[0], axis=1)
-            # ===== الصفوف 0-3 تتحذف =====
-            temp_df = temp_df.drop(index=[0,1,2,3]).reset_index(drop=True)
+            # أورانج يبدأ الهيدر من الصف الخامس (B5)
+            current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
+        else:
+            # اتصالات وفودافون يبدأ من الصف الأول
+            current_df = pd.read_excel(uploaded_file, engine="openpyxl")
 
-            # ===== الصف الخامس الجديد هو الهيدر =====
-            temp_df.columns = temp_df.iloc[0]  # أول صف بعد الحذف كعناوين
-            current_df = temp_df.iloc[1:].reset_index(drop=True)  # البيانات تبدأ بعد الهيدر
+        # ===== تنظيف الأعمدة =====
+        current_df.columns = current_df.columns.str.strip()  # إزالة الفراغات
 
-            # ===== تنظيف الأعمدة =====
-            current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
-            current_df.columns = current_df.columns.str.strip()  # إزالة الفراغات
+        # ===== التحقق من تطابق الأعمدة مع الشركة =====
+        if selected_company == "etisalat" and 'Originating_Number' not in current_df.columns:
+            st.error("ملف غير صالح لشركة اتصالات.")
+        elif selected_company == "vodafone" and 'B_NUMBER' not in current_df.columns:
+            st.error("ملف غير صالح لشركة فودافون.")
+        elif selected_company == "orange" and 'OTHER_MSISDN' not in current_df.columns:
+            st.error("ملف غير صالح لشركة اورانج.")
+        else:
+            st.success(f"تم فتح الملف: {uploaded_file.name}")
+            st.dataframe(current_df)
 
-            # ===== إزالة الأعمدة والصفوف الفارغة تمامًا =====
-            current_df = current_df.dropna(how='all', axis=1)
-            current_df = current_df.dropna(how='all', axis=0).reset_index(drop=True)
-
-            # ===== عرض البيانات للتأكد =====
-            st.write("عدد الصفوف بعد القراءة:", len(current_df))
-            st.dataframe(current_df.head(10))
-
-except Exception as e:
-            st.error(f"خطأ في فتح الملف: {e}")
+    except Exception as e:
+        st.error(f"خطأ في فتح الملف: {e}")
 
 # ================== دوال تنسيق Excel ==================
 def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
@@ -407,6 +385,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
