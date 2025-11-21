@@ -42,18 +42,17 @@ if st.session_state.logged_in:
             current_df = current_df.dropna(how='all', axis=1)  # حذف الأعمدة الفارغة تمامًا
 
         # ===== التحقق من تطابق الأعمدة مع الشركة =====
-        if selected_company == "etisalat" and 'Originating_Number' not in current_df.columns:
-            st.error("ملف غير صالح لشركة اتصالات.")
-        elif selected_company == "vodafone" and 'B_NUMBER' not in current_df.columns:
-            st.error("ملف غير صالح لشركة فودافون.")
-        elif selected_company == "orange" and 'OTHER_MSISDN' not in current_df.columns:
-            st.error("ملف غير صالح لشركة اورانج.")
-        else:
-            st.success(f"تم فتح الملف: {uploaded_file.name}")
-            st.dataframe(current_df)
-
-    except Exception as e:
-        st.error(f"خطأ في فتح الملف: {e}")
+            if selected_company == "etisalat" and 'Originating_Number' not in current_df.columns:
+                st.error("ملف غير صالح لشركة اتصالات.")
+            elif selected_company == "vodafone" and 'B_NUMBER' not in current_df.columns:
+                st.error("ملف غير صالح لشركة فودافون.")
+            elif selected_company == "orange" and 'OTHER_MSISDN' not in current_df.columns:
+                st.error("ملف غير صالح لشركة اورانج.")
+            else:
+                st.success(f"تم فتح الملف: {uploaded_file.name}")
+                st.dataframe(current_df)
+        except Exception as e:
+            st.error(f"خطأ في فتح الملف: {e}")
 
 # ================== دوال تنسيق Excel ==================
 def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
@@ -401,6 +400,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
