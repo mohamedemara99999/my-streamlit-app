@@ -25,19 +25,30 @@ else:
 
     uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
     current_df = None
-    
+ st.title("Excel Analyzer Tool - Streamlit")
+
+# اختيار الشركة أولًا
+selected_company = st.selectbox(
+    "اختر الشركة", 
+    ["etisalat", "vodafone", "orange"]
+)
+
+# رفع الملف
+uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
+current_df = None
+   
 if uploaded_file is not None:
     try:
         if selected_company == "orange":
-            # أورانج يبدأ الهيدر من الصف الخامس و العمود B
-            current_df = pd.read_excel(
-                uploaded_file, 
-                header=4,        # الصف الخامس كـ header
-                usecols="B:Z"    # افترضنا البيانات من B إلى Z (عدّل حسب أعمدةك)
-            )
+            # ملفات أورانج يبدأ الهيدر من الصف الخامس (B5)
+            current_df = pd.read_excel(uploaded_file, header=4)
         else:
             # اتصالات وفودافون تبدأ من الصف الأول
             current_df = pd.read_excel(uploaded_file)
+
+        # إزالة العمود A الفارغ لو موجود
+        if current_df.columns[0] == 'Unnamed: 0':
+            current_df = current_df.iloc[:, 1:]
 
         # تنظيف أسماء الأعمدة من الفراغات
         current_df.columns = current_df.columns.str.strip()
