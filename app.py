@@ -23,8 +23,8 @@ if not st.session_state.logged_in:
 else:
     st.title("Excel Analyzer Tool - Streamlit")
     # ===== رفع الملف =====
-    uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
-    current_df = None
+uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
+current_df = None
 
 if uploaded_file is not None:
     try:
@@ -386,5 +386,6 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
