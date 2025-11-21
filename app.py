@@ -28,12 +28,14 @@ else:
 
     if uploaded_file is not None:
         try:
-            current_df = pd.read_excel(uploaded_file, engine="openpyxl")
-            st.success(f"تم فتح الملف: {uploaded_file.name}")
-            st.dataframe(current_df)
+            if selected_company == "orange":
+                current_df = pd.read_excel(uploaded_file, header=4)
+            else:
+                current_df = pd.read_excel(uploaded_file)
+                st.success(f"تم فتح الملف: {uploaded_file.name}")
+                st.dataframe(current_df)
         except Exception as e:
             st.error(f"خطأ في فتح الملف: {e}")
-
 # ================== دوال تنسيق Excel ==================
 def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
     output.seek(0)
@@ -371,6 +373,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
