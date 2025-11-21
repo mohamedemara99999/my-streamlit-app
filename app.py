@@ -22,31 +22,29 @@ if not st.session_state.logged_in:
 
 else:
     st.title("Excel Analyzer Tool - Streamlit")
-
+    # ===== اختيار الشركة =====
+    selected_company = st.selectbox(
+    "اختر الشركة",
+    )
+    ["etisalat", "vodafone", "orange"]
+    # ===== رفع الملف =====
     uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
     current_df = None
 
 if uploaded_file is not None:
     try:
-        # إذا المستخدم اختار أن الملف من أورانج أو auto -> نقرأ الهيدر من الصف الخامس
-        if selected_company == "orange" or selected_company == "auto":
-            # اقرأ بداية من الصف الخامس (header = 4)
-            current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
-            # لو العمود الأول فارغ أو اسمه Unnamed نعمل drop
-            first_col_name = current_df.columns[0]
-            if str(first_col_name).lower().startswith("unnamed") or current_df.iloc[:,0].isna().all():
-                current_df = current_df.iloc[:,1:].copy()
+        if selected_company == "orange":
+            current_df = pd.read_excel(uploaded_file, header=4)
         else:
-            # قراءة عادية للملفات الأخرى
-            current_df = pd.read_excel(uploaded_file, engine="openpyxl")
-
-        # تنظيف أسماء الأعمدة من فراغات غير مرغوبة
-        current_df.columns = current_df.columns.astype(str).str.strip()
+            current_df = pd.read_excel(uploaded_file)
+        current_df = pd.read_excel(uploaded_file, engine="openpyxl")
 
         st.success(f"تم فتح الملف: {uploaded_file.name}")
         st.dataframe(current_df)
+
     except Exception as e:
         st.error(f"خطأ في فتح الملف: {e}")
+
 # ================== دوال تنسيق Excel ==================
 def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
     output.seek(0)
@@ -281,117 +279,75 @@ def generate_vodafone_report(df):
     final_output = format_excel_sheets(output, header_color="FF0000")
     return final_output
 
+# ================== تقرير أورانج ==================
 def generate_orange_report(df):
-    # تنظيف أسماء الأعمدة (لضمان المطابقة)
-    df = df.copy()
-    df.columns = df.columns.astype(str).str.strip()
+        required_cols = [
+            'TARGET_MSISDN','TARGET_IMEI','TARGET_IMSI','TARGET_IMEI_TYPE','EVENT_START_TIME',
+            'CALL_DURATION','EVENT_DIRECTION','OTHER_MSISDN','OTHER_NAME','OTHER_ID',
+            'OTHER_ID_TYPE','OTHER_ADDRESS','CELL_ADDRESS','CELL_LAT','CELL_LONG'
+        ]
+        for col in required_cols:
+            if col not in df.columns:
+                st.error(f"العمود {col} غير موجود في الملف")
+                return None
 
-    # نجعل البحث عن الأعمدة غير حساس للمسافات
-    required_cols = [
-        'TARGET_MSISDN','TARGET_IMEI','TARGET_IMSI','TARGET_IMEI_TYPE','EVENT_START_TIME',
-        'CALL_DURATION','EVENT_DIRECTION','OTHER_MSISDN','OTHER_NAME','OTHER_ID',
-        'OTHER_ID_TYPE','OTHER_ADDRESS','CELL_ADDRESS','CELL_LAT','CELL_LONG'
-    ]
-    # تحقق مرن: نقارن بعد إزالة الفراغات من أسماء الأعمدة
-    missing = [c for c in required_cols if c not in df.columns]
-    if missing:
-        st.error(f"الأعمدة التالية مفقودة أو اسمها مختلف (بعد التنظيف): {missing}")
-        return None
+        numbers = df['OTHER_MSISDN'].astype(str)
+        freq = numbers.value_counts().reset_index()
+        freq.columns = ['B Number','Count']
 
-    # تنظيف قيم الأعمدة (مساحات زائدة)
-    for col in df.columns:
-        if df[col].dtype == object:
-            df[col] = df[col].astype(str).str.strip()
+        calls_df = freq.merge(
+            df[['OTHER_MSISDN','OTHER_NAME','OTHER_ADDRESS','OTHER_ID']].drop_duplicates(subset='OTHER_MSISDN'),
+            left_on='B Number', right_on='OTHER_MSISDN', how='left'
+        )
 
-    # تحويل أرقام الـ imei للأرقام بدون فواصل لو موجودة كـ float
-    df['TARGET_IMEI'] = df['TARGET_IMEI'].replace({'nan': ''})  # حالات NaN كـ 'nan' بعد التحويل
-    df['TARGET_IMEI'] = df['TARGET_IMEI'].apply(lambda x: str(int(float(x))) if x not in ['', 'nan'] and str(x).replace('.0','').isdigit() else x)
+        sms_count = df[df['EVENT_DIRECTION'].astype(str).str.strip()=="SMSMT"].groupby('OTHER_MSISDN').size().reset_index(name='SMS')
+        calls_df = calls_df.merge(sms_count, left_on='B Number', right_on='OTHER_MSISDN', how='left')
+        calls_df['SMS'] = calls_df['SMS'].fillna(0).astype(int)
 
-    # حساب التكرارات
-    numbers = df['OTHER_MSISDN'].astype(str)
-    freq = numbers.value_counts().reset_index()
-    freq.columns = ['B Number','Count']
+        calls_df = calls_df[['B Number','Count','OTHER_NAME','OTHER_ADDRESS','OTHER_ID','SMS']]
+        calls_df.columns = ['B Number','Count','B Full Name','B Address','B Number id','SMS']
+        calls_df['B Number'] = calls_df['B Number'].apply(str)
+        calls_df['B Number id'] = calls_df['B Number id'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
+        calls_df['Count'] = calls_df['Count'].astype(int)
+        calls_df = calls_df.sort_values(by='Count', ascending=False)
 
-    calls_df = freq.merge(
-        df[['OTHER_MSISDN','OTHER_NAME','OTHER_ADDRESS','OTHER_ID']].drop_duplicates(subset='OTHER_MSISDN'),
-        left_on='B Number', right_on='OTHER_MSISDN', how='left'
-    )
+        df['TARGET_IMEI'] = df['TARGET_IMEI'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
+        imei_group = df.groupby('TARGET_IMEI').agg(
+            Count=('TARGET_IMEI','count'),
+            TARGET_IMEI_TYPE=('TARGET_IMEI_TYPE','first'),
+            First_Use_Date=('EVENT_START_TIME','min'),
+            Last_Use_Date=('EVENT_START_TIME','max'),
+            First_Use_Address=('CELL_ADDRESS','first'),
+            Last_Use_Address=('CELL_ADDRESS','last')
+        ).reset_index()
+        imei_group['Device Info'] = imei_group['TARGET_IMEI'].apply(lambda x: f'https://www.imei.info/calc/?imei={x}')
+        imei_group = imei_group[['TARGET_IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
+        imei_group.columns = ['IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']
+        imei_group['Count'] = imei_group['Count'].astype(int)
+        imei_group = imei_group.sort_values(by='Count', ascending=False)
 
-    # حساب SMS بطريقة مرنة (نتخلص من الفراغات ونجعل المقارنة case-insensitive)
-    df['EVENT_DIRECTION_CLEAN'] = df['EVENT_DIRECTION'].astype(str).str.strip().str.upper()
-    sms_count = df[df['EVENT_DIRECTION_CLEAN'].str.contains("SMS", na=False)].groupby('OTHER_MSISDN').size().reset_index(name='SMS')
-    calls_df = calls_df.merge(sms_count, left_on='B Number', right_on='OTHER_MSISDN', how='left')
-    calls_df['SMS'] = calls_df['SMS'].fillna(0).astype(int)
-
-    calls_df = calls_df[['B Number','Count','OTHER_NAME','OTHER_ADDRESS','OTHER_ID','SMS']]
-    calls_df.columns = ['B Number','Count','B Full Name','B Address','B Number id','SMS']
-    calls_df['B Number'] = calls_df['B Number'].apply(str)
-    # ضبط B Number id للتعامل مع أرقام المفردة و NaN
-    def safe_id(x):
-        try:
-            if pd.isna(x) or x=='':
-                return ''
-            return str(int(float(x)))
-        except:
-            return str(x)
-    calls_df['B Number id'] = calls_df['B Number id'].apply(safe_id)
-    calls_df['Count'] = calls_df['Count'].astype(int)
-    calls_df = calls_df.sort_values(by='Count', ascending=False)
-
-    # تجميع IMEI
-    def normalize_imei(val):
-        try:
-            if val in [None, '', 'nan']:
-                return ''
-            s = str(val).strip()
-            if s.replace('.0','').isdigit():
-                return str(int(float(s)))
-            return s
-        except:
-            return str(val)
-
-    df['TARGET_IMEI'] = df['TARGET_IMEI'].apply(normalize_imei)
-    imei_group = df.groupby('TARGET_IMEI').agg(
-        Count=('TARGET_IMEI','count'),
-        TARGET_IMEI_TYPE=('TARGET_IMEI_TYPE','first'),
-        First_Use_Date=('EVENT_START_TIME','min'),
-        Last_Use_Date=('EVENT_START_TIME','max'),
-        First_Use_Address=('CELL_ADDRESS','first'),
-        Last_Use_Address=('CELL_ADDRESS','last')
-    ).reset_index()
-    imei_group['Device Info'] = imei_group['TARGET_IMEI'].apply(lambda x: f'https://www.imei.info/calc/?imei={x}' if x else '')
-    imei_group = imei_group[['TARGET_IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
-    imei_group.columns = ['IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']
-    imei_group['Count'] = imei_group['Count'].astype(int)
-    imei_group = imei_group.sort_values(by='Count', ascending=False)
-
-    # تجميع مواقع
-    site_df = df.copy()
-    # تأكد من تحويل الإحداثيات لأرقام إذا كانت نصية
-    site_df['CELL_LAT'] = pd.to_numeric(site_df['CELL_LAT'], errors='coerce')
-    site_df['CELL_LONG'] = pd.to_numeric(site_df['CELL_LONG'], errors='coerce')
-    site_group = site_df.groupby('CELL_ADDRESS').agg(
-        Count=('CELL_ADDRESS','count'),
-        First_Use_Date=('EVENT_START_TIME','min'),
-        Last_Use_Date=('EVENT_START_TIME','max'),
-        LAT=('CELL_LAT','first'),
-        LON=('CELL_LONG','first')
-    ).reset_index()
-    site_group['Map'] = site_group.apply(lambda row: f'https://www.google.com/maps/search/?api=1&query={row["LAT"]},{row["LON"]}' 
+        site_df = df.groupby('CELL_ADDRESS').agg(
+            Count=('CELL_ADDRESS','count'),
+            First_Use_Date=('EVENT_START_TIME','min'),
+            Last_Use_Date=('EVENT_START_TIME','max'),
+            LAT=('CELL_LAT','first'),
+            LON=('CELL_LONG','first')
+        ).reset_index()
+        site_df['Map'] = site_df.apply(lambda row: f'https://www.google.com/maps/search/?api=1&query={row["LAT"]},{row["LON"]}' 
                                        if pd.notna(row["LAT"]) and pd.notna(row["LON"]) else '', axis=1)
-    site_group = site_group[['CELL_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
-    site_group = site_group.sort_values(by='Count', ascending=False)
+        site_df = site_df[['CELL_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
+        site_df = site_df.sort_values(by='Count', ascending=False)
 
-    # إخراج Excel
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        calls_df.to_excel(writer, sheet_name="calls", index=False)
-        imei_group.to_excel(writer, sheet_name="imei", index=False)
-        site_group.to_excel(writer, sheet_name="site", index=False)
-    output.seek(0)
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            calls_df.to_excel(writer, sheet_name="calls", index=False)
+            imei_group.to_excel(writer, sheet_name="imei", index=False)
+            site_df.to_excel(writer, sheet_name="site", index=False)
+        output.seek(0)
 
-    final_output = format_excel_sheets(output, header_color="FF6600")
-    return final_output
+        final_output = format_excel_sheets(output, header_color="FF6600")
+        return final_output
+
 # ================== أزرار التحليل ==================
 if current_df is not None:
     st.subheader("توليد تقارير")
@@ -426,10 +382,3 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
-
-
-
-
-
-
