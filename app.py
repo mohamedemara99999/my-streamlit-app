@@ -58,7 +58,7 @@ else:
                 st.write("عدد الصفوف بعد القراءة:", len(current_df))
                 st.dataframe(current_df.head(10))
 
-            else:
+    else:
                 # ملفات اتصالات وفودافون كما هي
                 current_df = pd.read_excel(uploaded_file, engine="openpyxl")
                 current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
@@ -415,6 +415,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
