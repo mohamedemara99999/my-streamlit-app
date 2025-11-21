@@ -42,35 +42,39 @@ def format_excel_sheets(output, header_color="228B22", highlight_row=None, highl
     header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=14)
     green_link_font = Font(color="006400", underline="single")
-
     for ws in wb.worksheets:
-        # ===== تلوين الهيدر في كل الصفحات =====
+        # تلوين الهيدر
         for cell in ws[1]:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center")
-
-        # ===== تلوين الصف المستثنى فقط في ورقة calls =====
-        if highlight_row and ws.title.lower() == "calls":
+        # رؤوس الأعمدة
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+        
+        # تلوين الصف المستثنى
+        if highlight_row is not None:
             for cell in ws[highlight_row]:
                 cell.fill = PatternFill(start_color=highlight_color, end_color=highlight_color, fill_type="solid")
 
-        # ===== تحويل الروابط لكلمة مختصرة مع الحفاظ على هايبرلينك =====
-        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-            for cell in row:
-                if isinstance(cell.value, str) and cell.value.startswith("http"):
-                    url = cell.value
-                    if "google.com/maps" in url:
-                        cell.value = "map"
-                    elif "imei.info" in url:
-                        cell.value = "check info"
-                    cell.hyperlink = url
-                    cell.font = green_link_font
+            # تحويل الروابط لكلمة map أو check info
+            for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+                for cell in row:
+                    if isinstance(cell.value, str) and cell.value.startswith("http"):
+                        url = cell.value
+                        if "google.com/maps" in url:
+                            cell.value = "map"
+                        elif "imei.info" in url:
+                            cell.value = "check info"
+                        cell.hyperlink = url
+                        cell.font = green_link_font
 
-    final_output = BytesIO()
-    wb.save(final_output)
-    final_output.seek(0)
-    return final_output
+        final_output = BytesIO()
+        wb.save(final_output)
+        final_output.seek(0)
+        return final_output
 
 # ================== تقرير اتصالات ==================
 def generate_etisalat_report(df):
@@ -121,8 +125,8 @@ def generate_etisalat_report(df):
     df_final = df_final.sort_values(by='Count', ascending=False)
 
     # ---- استثناء الصف الثاني ----
-    if len(df_final) >= 2:
-        second_row_index = df_final.index[1]
+    if len(df_final) >= 1:
+        second_row_index = df_final.index[0]
         second_row = df_final.loc[[second_row_index]].copy()
         second_b_number = second_row.at[second_row_index, 'B Number']
         df_match = df[df['Originating_Number'].astype(str) == second_b_number]
