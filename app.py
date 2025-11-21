@@ -4,7 +4,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from io import BytesIO
 # ================== كلمة المرور ==================
-PASSWORD = "1234"
+PASSWORD = "m7md3mara2025"
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -400,6 +400,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
