@@ -17,15 +17,7 @@ if not st.session_state.logged_in:
         if password_input == PASSWORD:
             st.session_state.logged_in = True
             st.experimental_rerun()
-        else:st.error("كلمة المرور غير صحيحة")
-else:
-    st.title("Excel Analyzer Tool - Streamlit")
-# ===== اختيار الشركة =====
-selected_company = st.selectbox(
-    "اختر الشركة",
-    ["etisalat", "vodafone", "orange"]
-)
-
+else:st.error("كلمة المرور غير صحيحة")
 # ===== رفع الملف =====
 uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
 current_df = None
@@ -393,6 +385,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
