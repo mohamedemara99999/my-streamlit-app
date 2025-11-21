@@ -1,15 +1,12 @@
 import streamlit as st
 import pandas as pd
-from openpyxl import load_workbook
-from openpyxl.styles import PatternFill, Font, Alignment
-from io import BytesIO
-# ================== كلمة المرور ==================
-PASSWORD = "1234"
 
+# كلمة المرور
+PASSWORD = "1234"
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
-# ================== صفحة تسجيل الدخول ==================
+# صفحة تسجيل الدخول
 if not st.session_state.logged_in:
     st.title("تسجيل الدخول")
     password_input = st.text_input("ادخل كلمة المرور", type="password")
@@ -17,27 +14,34 @@ if not st.session_state.logged_in:
         if password_input == PASSWORD:
             st.session_state.logged_in = True
             st.experimental_rerun()
-else:st.error("كلمة المرور غير صحيحة")
-# ===== رفع الملف =====
-uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
-current_df = None
-
-if uploaded_file is not None:
-    try:
-        if selected_company == "orange":
-            # أورانج الهيدر في الصف الخامس
-            current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
         else:
-            current_df = pd.read_excel(uploaded_file, engine="openpyxl")
+            st.error("كلمة المرور غير صحيحة")
+else:
+    st.title("Excel Analyzer Tool - Streamlit")
 
-        # إزالة أي أعمدة فارغة
-        current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
+    # اختيار الشركة
+    selected_company = st.selectbox(
+        "اختر الشركة",
+        ["etisalat", "vodafone", "orange"]
+    )
 
-        st.success(f"تم فتح الملف: {uploaded_file.name}")
-        st.dataframe(current_df)
+    # رفع الملف
+    uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
+    current_df = None
 
-    except Exception as e:
-        st.error(f"خطأ في فتح الملف: {e}")
+    if uploaded_file is not None:
+        try:
+            if selected_company == "orange":
+                current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
+            else:
+                current_df = pd.read_excel(uploaded_file, engine="openpyxl")
+
+            current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
+            st.success(f"تم فتح الملف: {uploaded_file.name}")
+            st.dataframe(current_df)
+
+        except Exception as e:
+            st.error(f"خطأ في فتح الملف: {e}")
 
 # ================== دوال تنسيق Excel ==================
 def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
@@ -385,6 +389,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
