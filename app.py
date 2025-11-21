@@ -25,7 +25,7 @@ else:
 
     uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
     current_df = None
- st.title("Excel Analyzer Tool - Streamlit")
+st.title("Excel Analyzer Tool - Streamlit")
 
 # اختيار الشركة أولًا
 selected_company = st.selectbox(
@@ -397,6 +397,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
