@@ -21,17 +21,26 @@ if not st.session_state.logged_in:
 
 else:
     st.title("Excel Analyzer Tool - Streamlit")
-    # ===== رفع الملف =====
+# ===== اختيار الشركة =====
+selected_company = st.selectbox(
+    "اختر الشركة",
+    ["etisalat", "vodafone", "orange"]
+)
+
+# ===== رفع الملف =====
 uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
 current_df = None
 
 if uploaded_file is not None:
     try:
         if selected_company == "orange":
-            current_df = pd.read_excel(uploaded_file, header=4)
+            # أورانج الهيدر في الصف الخامس
+            current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
         else:
-            current_df = pd.read_excel(uploaded_file)
-        current_df = pd.read_excel(uploaded_file, engine="openpyxl")
+            current_df = pd.read_excel(uploaded_file, engine="openpyxl")
+
+        # إزالة أي أعمدة فارغة
+        current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
 
         st.success(f"تم فتح الملف: {uploaded_file.name}")
         st.dataframe(current_df)
@@ -385,6 +394,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
