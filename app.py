@@ -22,21 +22,17 @@ if not st.session_state.logged_in:
 
 else:
     st.title("Excel Analyzer Tool - Streamlit")
-
-
-selected_company = st.selectbox(
+    selected_company = st.selectbox(
     "اختر الشركة",
     ["etisalat", "vodafone", "orange"]
-)
-
-uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
-current_df = None
-
-if uploaded_file is not None:
-    try:
-        if selected_company == "orange":
-            # أورانج يبدأ الهيدر من الصف الخامس (B5)
-            current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
+    )
+    uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
+    current_df = None
+    if uploaded_file is not None:
+        try:
+            if selected_company == "orange":
+                # أورانج يبدأ الهيدر من الصف الخامس (B5)
+                current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
         else:
             current_df = pd.read_excel(uploaded_file, engine="openpyxl")
 
@@ -406,6 +402,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
