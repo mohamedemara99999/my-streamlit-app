@@ -37,15 +37,19 @@ else:
             if selected_company == "orange":
                 # ===== قراءة الملف بدون هيدر أولاً =====
                 temp_df = pd.read_excel(uploaded_file, header=None, engine="openpyxl")
-                
-                # ===== الصف الخامس هو الهيدر الحقيقي =====
-                temp_df.columns = temp_df.iloc[4]  # الصف الخامس كعناوين
-                current_df = temp_df.iloc[5:].reset_index(drop=True)  # البيانات تبدأ بعد الصف الخامس
-                
+                # ===== حذف العمود الأول =====
+                temp_df = temp_df.drop(temp_df.columns[0], axis=1)
+                # ===== الصفوف 0-3 تتحذف =====
+                temp_df = temp_df.drop(index=[0,1,2,3]).reset_index(drop=True)
+    
+                # ===== الصف الخامس الجديد هو الهيدر =====
+                temp_df.columns = temp_df.iloc[0]  # أول صف بعد الحذف كعناوين
+                current_df = temp_df.iloc[1:].reset_index(drop=True)  # البيانات تبدأ بعد الهيدر
+    
                 # ===== تنظيف الأعمدة =====
                 current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
                 current_df.columns = current_df.columns.str.strip()  # إزالة الفراغات
-                
+    
                 # ===== عرض البيانات للتأكد =====
                 st.write("عدد الصفوف بعد القراءة:", len(current_df))
                 st.dataframe(current_df.head(10))
@@ -407,6 +411,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
