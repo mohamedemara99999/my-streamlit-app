@@ -49,7 +49,11 @@ else:
                 # ===== تنظيف الأعمدة =====
                 current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
                 current_df.columns = current_df.columns.str.strip()  # إزالة الفراغات
-    
+                
+                 # ===== إزالة الأعمدة والصفوف الفارغة تمامًا =====
+                 current_df = current_df.dropna(how='all', axis=1)  # حذف الأعمدة الفارغة
+                 current_df = current_df.dropna(how='all', axis=0).reset_index(drop=True)  # حذف الصفوف الفارغة
+
                 # ===== عرض البيانات للتأكد =====
                 st.write("عدد الصفوف بعد القراءة:", len(current_df))
                 st.dataframe(current_df.head(10))
@@ -411,6 +415,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
