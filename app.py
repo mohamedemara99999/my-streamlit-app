@@ -20,11 +20,11 @@ if not st.session_state.logged_in:
         else:
             st.error("كلمة المرور غير صحيحة")
 
-else:
+if st.session_state.logged_in:
     st.title("Excel Analyzer Tool - Streamlit")
     selected_company = st.selectbox(
-    "اختر الشركة",
-    ["etisalat", "vodafone", "orange"]
+        "اختر الشركة",
+        ["etisalat", "vodafone", "orange"]
     )
     uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
     current_df = None
@@ -33,14 +33,13 @@ else:
             if selected_company == "orange":
                 # أورانج يبدأ الهيدر من الصف الخامس (B5)
                 current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
-        else:
+            else:
             current_df = pd.read_excel(uploaded_file, engine="openpyxl")
-
-        # ===== تنظيف الأعمدة =====
-        current_df.columns = current_df.columns.str.strip()  # إزالة الفراغات
-        # حذف الأعمدة كلها فارغة أو مسماها Unnamed
-        current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
-        current_df = current_df.dropna(how='all', axis=1)  # حذف الأعمدة الفارغة تمامًا
+            # ===== تنظيف الأعمدة =====
+            current_df.columns = current_df.columns.str.strip()  # إزالة الفراغات
+            # حذف الأعمدة كلها فارغة أو مسماها Unnamed
+            current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
+            current_df = current_df.dropna(how='all', axis=1)  # حذف الأعمدة الفارغة تمامًا
 
         # ===== التحقق من تطابق الأعمدة مع الشركة =====
         if selected_company == "etisalat" and 'Originating_Number' not in current_df.columns:
@@ -402,6 +401,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
