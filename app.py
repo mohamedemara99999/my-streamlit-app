@@ -126,7 +126,7 @@ def generate_etisalat_report(df):
 
     # ---- استثناء الصف الثاني ----
     if len(df_final) >= 1:
-        second_row_index = df_final.index[0]
+        second_row_index = df_final.index[2]
         second_row = df_final.loc[[second_row_index]].copy()
         second_b_number = second_row.at[second_row_index, 'B Number']
         df_match = df[df['Originating_Number'].astype(str) == second_b_number]
