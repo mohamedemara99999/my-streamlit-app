@@ -3,25 +3,58 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment
 from io import BytesIO
-# ================== كلمة المرور ==================
-PASSWORD = "m7md3mara2025"
 
+# ================== قائمة المستخدمين ==================
+USERS = {
+    "admin": "m7md3mara2025",
+    "user1": "1234",
+    "user2": "5678",
+    "user3": "2468"
+}
+if "active_sessions" not in st.session_state:
+    st.session_state.active_sessions = {}
+
+# حالة تسجيل الدخول
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+if "current_user" not in st.session_state:
+    st.session_state.current_user = None
 
 # ================== صفحة تسجيل الدخول ==================
 if not st.session_state.logged_in:
-    st.title("تسجيل الدخول")
-    password_input = st.text_input("ادخل كلمة المرور", type="password")
-    if st.button("دخول"):
-        if password_input == PASSWORD:
-            st.session_state.logged_in = True
-            st.experimental_rerun()
-        else:
-            st.error("كلمة المرور غير صحيحة")
+    st.title("🔐 تسجيل الدخول")
 
+    username = st.text_input("اسم المستخدم")
+    password = st.text_input("كلمة المرور", type="password")
+
+    if st.button("دخول"):
+        if username in USERS and USERS[username] == password:
+            # ===== منع الدخول المزدوج =====
+            if username in st.session_state.active_sessions and st.session_state.active_sessions[username]:
+                st.error("❌ هذا الحساب يستخدم حالياً على جهاز آخر")
+            else:
+                st.session_state.logged_in = True
+                st.session_state.current_user = username
+                st.session_state.active_sessions[username] = True
+                st.experimental_rerun()
+
+        else:
+            st.error("❌ اسم المستخدم أو كلمة المرور غير صحيحة")
+
+# ================== لو المستخدم سجل دخول ==================
 if st.session_state.logged_in:
+    st.sidebar.success(f"مرحباً يا {st.session_state.current_user} 👋")
+
+    # ===== زر تسجيل الخروج =====
+    st.sidebar.button("تسجيل خروج", on_click=lambda: (
+        st.session_state.active_sessions.update({st.session_state.current_user: False}),
+        st.session_state.update({"logged_in": False, "current_user": None}),
+        st.experimental_rerun()
+    ))
+
     st.title("Excel Analyzer Tool - Streamlit")
+    
+
     selected_company = st.selectbox(
         "اختر الشركة",
         ["etisalat", "vodafone", "orange"]
@@ -400,6 +433,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
