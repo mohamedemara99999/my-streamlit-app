@@ -20,29 +20,31 @@ else:
     st.title("Excel Analyzer Tool - Streamlit")
 
     # اختيار الشركة
-    selected_company = st.selectbox(
-        "اختر الشركة",
-        ["etisalat", "vodafone", "orange"]
-    )
+selected_company = st.selectbox(
+    "اختر الشركة",
+    ["etisalat", "vodafone", "orange"]
+)
 
-    # رفع الملف
-    uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
-    current_df = None
+# رفع الملف
+uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
+current_df = None
 
-    if uploaded_file is not None:
-        try:
-            if selected_company == "orange":
-                current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
-                current_df.columns = current_df.columns.str.strip()
-            else:
-                current_df = pd.read_excel(uploaded_file, engine="openpyxl")
-
+if uploaded_file is not None:
+    try:
+        if selected_company == "orange":
+            # اقرأ كل الصفوف بدون هيدر
+            temp_df = pd.read_excel(uploaded_file, header=None, engine="openpyxl")
+            # افترض أن الصف الخامس هو الهيدر الحقيقي (index 4)
+            temp_df.columns = temp_df.iloc[4]  # الصف الخامس كعناوين
+        else:
+            current_df = temp_df.iloc[5:].reset_index(drop=True)
             current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
-            st.success(f"تم فتح الملف: {uploaded_file.name}")
-            st.dataframe(current_df)
+            current_df.columns = current_df.columns.str.strip()
+            st.write("عدد الصفوف بعد القراءة:", len(current_df))
+            st.dataframe(current_df.head(10))
 
-        except Exception as e:
-            st.error(f"خطأ في فتح الملف: {e}")
+    except Exception as e:
+        st.error(f"خطأ في فتح الملف: {e}")
 
 # ================== دوال تنسيق Excel ==================
 def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
@@ -390,6 +392,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
