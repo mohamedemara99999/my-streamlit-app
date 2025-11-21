@@ -30,9 +30,14 @@ if uploaded_file is not None:
     try:
         # قراءة أورانج من الصف الخامس (B5)
         current_df = pd.read_excel(uploaded_file, header=4)  # header=4 يعني الصف الخامس
+
         # إزالة العمود A الفارغ لو موجود
         if current_df.columns[0] == 'Unnamed: 0':
             current_df = current_df.iloc[:, 1:]
+
+        # ---- تنظيف أسماء الأعمدة من الفراغات ----
+        current_df.columns = current_df.columns.str.strip()
+
         st.success(f"تم فتح الملف: {uploaded_file.name}")
         st.dataframe(current_df)
     except Exception as e:
@@ -376,6 +381,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
