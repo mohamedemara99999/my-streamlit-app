@@ -25,8 +25,8 @@ else:
     # ===== اختيار الشركة =====
     selected_company = st.selectbox(
     "اختر الشركة",
-    )
     ["etisalat", "vodafone", "orange"]
+    )
     # ===== رفع الملف =====
     uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
     current_df = None
@@ -382,3 +382,4 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
