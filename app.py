@@ -1,8 +1,28 @@
 import streamlit as st
 import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Font, Alignment
+from io import BytesIO
+# ================== كلمة المرور ==================
+PASSWORD = "1234"
 
-# صفحة اختيار الشركة ورفع الملف
-st.title("Excel Analyzer Tool - Streamlit")
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+# ================== صفحة تسجيل الدخول ==================
+if not st.session_state.logged_in:
+    st.title("تسجيل الدخول")
+    password_input = st.text_input("ادخل كلمة المرور", type="password")
+    if st.button("دخول"):
+        if password_input == PASSWORD:
+            st.session_state.logged_in = True
+            st.experimental_rerun()
+        else:
+            st.error("كلمة المرور غير صحيحة")
+
+else:
+    st.title("Excel Analyzer Tool - Streamlit")
+
 
 selected_company = st.selectbox(
     "اختر الشركة",
@@ -14,16 +34,17 @@ current_df = None
 
 if uploaded_file is not None:
     try:
-        # ===== قراءة الملف حسب الشركة =====
         if selected_company == "orange":
             # أورانج يبدأ الهيدر من الصف الخامس (B5)
             current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
         else:
-            # اتصالات وفودافون يبدأ من الصف الأول
             current_df = pd.read_excel(uploaded_file, engine="openpyxl")
 
         # ===== تنظيف الأعمدة =====
         current_df.columns = current_df.columns.str.strip()  # إزالة الفراغات
+        # حذف الأعمدة كلها فارغة أو مسماها Unnamed
+        current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
+        current_df = current_df.dropna(how='all', axis=1)  # حذف الأعمدة الفارغة تمامًا
 
         # ===== التحقق من تطابق الأعمدة مع الشركة =====
         if selected_company == "etisalat" and 'Originating_Number' not in current_df.columns:
@@ -385,6 +406,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
