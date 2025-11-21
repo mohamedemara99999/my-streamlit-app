@@ -269,7 +269,7 @@ def generate_vodafone_report(df):
     return final_output
 
 # ================== تقرير أورانج ==================
-    def generate_orange_report(df):
+def generate_orange_report(df):
         required_cols = [
             'TARGET_MSISDN','TARGET_IMEI','TARGET_IMSI','TARGET_IMEI_TYPE','EVENT_START_TIME',
             'CALL_DURATION','EVENT_DIRECTION','OTHER_MSISDN','OTHER_NAME','OTHER_ID',
@@ -371,6 +371,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
