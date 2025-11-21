@@ -25,14 +25,19 @@ else:
 
     uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
     current_df = None
+    
+if uploaded_file is not None:
+    try:
+        # قراءة أورانج من الصف الخامس (B5)
+        current_df = pd.read_excel(uploaded_file, header=4)  # header=4 يعني الصف الخامس
+        # إزالة العمود A الفارغ لو موجود
+        if current_df.columns[0] == 'Unnamed: 0':
+            current_df = current_df.iloc[:, 1:]
+        st.success(f"تم فتح الملف: {uploaded_file.name}")
+        st.dataframe(current_df)
+    except Exception as e:
+        st.error(f"خطأ في فتح الملف: {e}")
 
-    if uploaded_file is not None:
-        try:
-            current_df = pd.read_excel(uploaded_file, engine="openpyxl")
-            st.success(f"تم فتح الملف: {uploaded_file.name}")
-            st.dataframe(current_df)
-        except Exception as e:
-            st.error(f"خطأ في فتح الملف: {e}")
 
 # ================== دوال تنسيق Excel ==================
 def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
@@ -371,5 +376,6 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
