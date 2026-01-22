@@ -77,15 +77,15 @@ if st.session_state.logged_in:
             st.error(f"خطأ في قراءة الملف: {e}")
 
 # ================== دالة تنسيق Excel ==================
-def format_excel_sheets(output):
+def format_excel_sheets(output, header_color="006400"):  # اللون الافتراضي أخضر غامق
     output.seek(0)
     wb = load_workbook(output)
 
-    header_fill = PatternFill("solid", fgColor="006400")  # الهيدر أخضر غامق
+    header_fill = PatternFill("solid", fgColor=header_color)
     header_font = Font(bold=True, color="FFFFFF")
 
-    first_row_fill_calls = PatternFill("solid", fgColor="FFFF00")  # أول صف في calls أصفر
-    first_row_font_calls = Font(bold=True, color="000000")  # خط أسود
+    first_row_fill_calls = PatternFill("solid", fgColor="FFFF00")  # أول صف في شيت calls
+    first_row_font_calls = Font(bold=True, color="000000")
 
     for ws in wb.worksheets:
         # ===== الهيدر لكل الشيتات =====
@@ -96,14 +96,14 @@ def format_excel_sheets(output):
 
         # ===== أول صف في شيت calls فقط =====
         if ws.title.lower() == "calls" and ws.max_row > 1:
-            for cell in ws[2]:  # الصف الثاني في Excel = أول صف بعد الهيدر
+            for cell in ws[2]:
                 cell.fill = first_row_fill_calls
                 cell.font = first_row_font_calls
 
         # ===== روابط هايبرلينك =====
         for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
             for cell in row:
-                if isinstance(cell.value, str) and cell.value.startswith("http"):
+                if isinstance(cell.value, str) and isinstance(cell.value, str) and cell.value.startswith("http"):
                     cell.hyperlink = cell.value
                     if "google.com/maps" in cell.value:
                         cell.value = "Map"
@@ -455,3 +455,4 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
