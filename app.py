@@ -116,6 +116,7 @@ def format_excel_sheets(output, header_color="006400"):  # اللون الافت
     final.seek(0)
     return final
 
+
 # ================== تقرير اتصالات ==================
 def generate_etisalat_report(df, original_df):
 
@@ -234,9 +235,8 @@ def generate_etisalat_report(df, original_df):
         site_group.to_excel(writer, sheet_name='site', index=False)
         original_df.to_excel(writer, sheet_name='cheet', index=False)    # 👈 الشيت الأصلي
 
-    # بعد إنشاء ملف Excel في BytesIO باسم output
-    final_output = format_excel_sheets(output, header_color="006400", highlight_first_row=True)
-    return final_output
+    output.seek(0)
+    return format_excel_sheets(output, header_color="006400")  # أخضر غامق لاتصالات
 
 
 # ================== تقرير فودافون ==================
@@ -335,8 +335,10 @@ def generate_vodafone_report(df):
     output.seek(0)
 
     # ===== تطبيق التنسيقات والهايبرلينك =====
-    final_output = format_excel_sheets(output, header_color="FF0000")
+    output.seek(0)
+    final_output = format_excel_sheets(output, header_color="FF0000")  # أحمر للشركة
     return final_output
+
 
 # ================== تقرير أورانج ==================
 def generate_orange_report(df):
@@ -420,8 +422,9 @@ def generate_orange_report(df):
         df.to_excel(writer, sheet_name="cheet", index=False)  # <-- الصفحة الرابعة كاملة
 
     output.seek(0)
-    final_output = format_excel_sheets(output, header_color="FF6600")
+    final_output = format_excel_sheets(output, header_color="FF6600")  # برتقالي لأورانج
     return final_output
+
 
 # ================== أزرار التحليل ==================
 if current_df is not None:
@@ -457,5 +460,3 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
-
