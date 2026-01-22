@@ -11,10 +11,9 @@ USERS = {
     "user2": "5678",
     "user3": "2468"
 }
+
 if "active_sessions" not in st.session_state:
     st.session_state.active_sessions = {}
-
-# حالة تسجيل الدخول
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "current_user" not in st.session_state:
@@ -29,239 +28,157 @@ if not st.session_state.logged_in:
 
     if st.button("دخول"):
         if username in USERS and USERS[username] == password:
-            # ===== منع الدخول المزدوج =====
-            if username in st.session_state.active_sessions and st.session_state.active_sessions[username]:
-                st.error("❌ هذا الحساب يستخدم حالياً على جهاز آخر")
+            if st.session_state.active_sessions.get(username):
+                st.error("❌ هذا الحساب مستخدم حالياً")
             else:
                 st.session_state.logged_in = True
                 st.session_state.current_user = username
                 st.session_state.active_sessions[username] = True
                 st.experimental_rerun()
-
         else:
-            st.error("❌ اسم المستخدم أو كلمة المرور غير صحيحة")
+            st.error("❌ بيانات غير صحيحة")
 
-# ================== لو المستخدم سجل دخول ==================
-if st.session_state.logged_in:
-    st.sidebar.success(f"مرحباً يا {st.session_state.current_user} 👋")
+    st.stop()
 
-    # ===== زر تسجيل الخروج =====
-    st.sidebar.button("تسجيل خروج", on_click=lambda: (
-        st.session_state.active_sessions.update({st.session_state.current_user: False}),
-        st.session_state.update({"logged_in": False, "current_user": None}),
-        st.experimental_rerun()
-    ))
+# ================== واجهة البرنامج ==================
+st.sidebar.success(f"مرحباً {st.session_state.current_user} 👋")
+if st.sidebar.button("تسجيل خروج"):
+    st.session_state.active_sessions[st.session_state.current_user] = False
+    st.session_state.logged_in = False
+    st.session_state.current_user = None
+    st.experimental_rerun()
 
-    st.title("Excel Analyzer Tool - Streamlit")
-    
+st.title("📊 Excel Analyzer Tool")
 
-    selected_company = st.selectbox(
-        "اختر الشركة",
-        ["etisalat", "vodafone", "orange"]
-    )
-    uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
-    current_df = None
-    if uploaded_file is not None:
-        try:
-            if selected_company == "orange":
-                # أورانج يبدأ الهيدر من الصف الخامس (B5)
-                current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
-            else:
-                current_df = pd.read_excel(uploaded_file, engine="openpyxl")
-                # ===== تنظيف الأعمدة =====
-            current_df.columns = current_df.columns.str.strip()  # إزالة الفراغات
-            # حذف الأعمدة كلها فارغة أو مسماها Unnamed
-            current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
-            current_df = current_df.dropna(how='all', axis=1)  # حذف الأعمدة الفارغة تمامًا
+selected_company = st.selectbox("اختر الشركة", ["etisalat", "vodafone", "orange"])
+uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
 
-        # ===== التحقق من تطابق الأعمدة مع الشركة =====
-            if selected_company == "etisalat" and 'Originating_Number' not in current_df.columns:
-                st.error("ملف غير صالح لشركة اتصالات.")
-            elif selected_company == "vodafone" and 'B_NUMBER' not in current_df.columns:
-                st.error("ملف غير صالح لشركة فودافون.")
-            elif selected_company == "orange" and 'OTHER_MSISDN' not in current_df.columns:
-                st.error("ملف غير صالح لشركة اورانج.")
-            else:
-                st.success(f"تم فتح الملف: {uploaded_file.name}")
-                st.dataframe(current_df)
-        except Exception as e:
-            st.error(f"خطأ في فتح الملف: {e}")
+current_df = None
 
-# ================== دوال تنسيق Excel ==================
-def format_excel_sheets(output, header_color="228B22", highlight_row=None, highlight_color="FFFF00"):
+if uploaded_file:
+    try:
+        if selected_company == "orange":
+            current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
+        else:
+            current_df = pd.read_excel(uploaded_file, engine="openpyxl")
+
+        current_df.columns = current_df.columns.str.strip()
+        current_df = current_df.loc[:, ~current_df.columns.str.contains("^Unnamed")]
+        current_df = current_df.dropna(how="all", axis=1)
+
+        if selected_company == "etisalat" and "Originating_Number" not in current_df.columns:
+            st.error("❌ ملف غير صالح لاتصالات")
+        else:
+            st.success("✔️ تم فتح الملف")
+            st.dataframe(current_df)
+
+    except Exception as e:
+        st.error(f"خطأ في فتح الملف: {e}")
+
+# ================== تنسيق Excel ==================
+def format_excel_sheets(output, header_color="228B22", highlight_row=2):
     output.seek(0)
     wb = load_workbook(output)
 
     header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=14)
-    green_link_font = Font(color="006400", underline="single")
+    header_font = Font(bold=True, color="FFFFFF", size=13)
+    link_font = Font(color="006400", underline="single")
 
     for ws in wb.worksheets:
-        # ===== تلوين الهيدر في كل الصفحات =====
         for cell in ws[1]:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center")
 
-        # ===== تلوين الصف المستثنى فقط في ورقة calls =====
-        if highlight_row and ws.title.lower() == "calls":
+        if ws.title == "calls":
             for cell in ws[highlight_row]:
-                cell.fill = PatternFill(start_color=highlight_color, end_color=highlight_color, fill_type="solid")
+                cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
-        # ===== تحويل الروابط لكلمة مختصرة مع الحفاظ على هايبرلينك =====
-        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+        for row in ws.iter_rows(min_row=2):
             for cell in row:
                 if isinstance(cell.value, str) and cell.value.startswith("http"):
                     url = cell.value
-                    if "google.com/maps" in url:
-                        cell.value = "map"
-                    elif "imei.info" in url:
-                        cell.value = "check info"
+                    cell.value = "map" if "maps" in url else "check info"
                     cell.hyperlink = url
-                    cell.font = green_link_font
+                    cell.font = link_font
 
-    final_output = BytesIO()
-    wb.save(final_output)
-    final_output.seek(0)
-    return final_output
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return out
 
+# ================== تقرير اتصالات ==================
 def generate_etisalat_report(df):
-    import pandas as pd
-    from io import BytesIO
-
-    # ===== تنظيف الأعمدة =====
     df = df.copy()
-    df.columns = df.columns.str.strip()
     df['Originating_Number'] = df['Originating_Number'].astype(str)
     df['Terminating_Number'] = df['Terminating_Number'].astype(str)
 
-    # ===== حساب تكرار الأرقام (من الطرفين) =====
     numbers = pd.concat([df['Originating_Number'], df['Terminating_Number']])
     freq = numbers.value_counts().reset_index()
     freq.columns = ['B Number', 'Count']
     df_final = freq.copy()
 
-    # ===== dictionary لربط أي رقم ببياناته =====
     b_data = {}
-    for _, row in df.iterrows():
-        for col in ['Originating_Number', 'Terminating_Number']:
-            num = str(row[col])
-            if num not in b_data:
-                b_data[num] = {
-                    'B Full Name': row.get('B_Number_Full_Name', ''),
-                    'B Address': row.get('B_Number_Address', ''),
-                    'B_NUMBER_SITE_ADDRESS': row.get('B_Number_MU_Site_Address', ''),
-                    'Latitude': row.get('B_Number_MU_Latitude', ''),
-                    'Longitude': row.get('B_Number_MU_Longitude', '')
+    for _, r in df.iterrows():
+        for c in ['Originating_Number', 'Terminating_Number']:
+            if r[c] not in b_data:
+                b_data[r[c]] = {
+                    "Name": r.get("B_Number_Full_Name", ""),
+                    "Addr": r.get("B_Number_Address", ""),
+                    "Site": r.get("B_Number_MU_Site_Address", ""),
+                    "Lat": r.get("B_Number_MU_Latitude", ""),
+                    "Lon": r.get("B_Number_MU_Longitude", "")
                 }
 
-    for col in ['B Full Name','B Address','B_NUMBER_SITE_ADDRESS','Latitude','Longitude']:
-        df_final[col] = df_final['B Number'].map(lambda x: b_data[x][col] if x in b_data else '')
+    df_final["B Full Name"] = df_final["B Number"].map(lambda x: b_data.get(x, {}).get("Name", ""))
+    df_final["B Address"] = df_final["B Number"].map(lambda x: b_data.get(x, {}).get("Addr", ""))
+    df_final["B_NUMBER_SITE_ADDRESS"] = df_final["B Number"].map(lambda x: b_data.get(x, {}).get("Site", ""))
+    df_final["Latitude"] = df_final["B Number"].map(lambda x: b_data.get(x, {}).get("Lat", ""))
+    df_final["Longitude"] = df_final["B Number"].map(lambda x: b_data.get(x, {}).get("Lon", ""))
 
-    # ===== Map =====
-    df_final['Map'] = df_final.apply(
-        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}'
-        if pd.notna(r['Latitude']) and pd.notna(r['Longitude']) and r['Latitude'] != '' else '',
-        axis=1
+    df_final["Map"] = df_final.apply(
+        lambda r: f"https://www.google.com/maps/search/?api=1&query={r['Latitude']},{r['Longitude']}"
+        if r["Latitude"] != "" else "", axis=1
     )
 
-    # ===== SMS (من Originating فقط – زي كود 2 بالظبط) =====
-    temp_df = df.copy()
-    temp_df['activity_clean'] = temp_df['Network_Activity_Type_Name'].astype(str).str.strip()
-    sms_stats = temp_df.groupby('Originating_Number').agg(
-        SMS=('activity_clean', lambda x: (x == 'SMS').sum())
-    ).reset_index()
+    temp = df.copy()
+    temp["Call_Start_Date"] = pd.to_datetime(temp["Call_Start_Date"])
 
-    df_final = df_final.merge(
-        sms_stats, left_on='B Number', right_on='Originating_Number', how='left'
-    ).drop(columns='Originating_Number')
-
-    df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
-    df_final['Count'] = df_final['Count'].astype(int)
-
-    # ===== First / Last Call (من الطرفين) =====
-    temp_df['Call_Start_Date'] = pd.to_datetime(temp_df['Call_Start_Date'])
     calls = pd.concat([
-        temp_df[['Originating_Number','Call_Start_Date']]
-            .rename(columns={'Originating_Number':'B Number'}),
-        temp_df[['Terminating_Number','Call_Start_Date']]
-            .rename(columns={'Terminating_Number':'B Number'})
+        temp[['Originating_Number','Call_Start_Date']].rename(columns={'Originating_Number':'B Number'}),
+        temp[['Terminating_Number','Call_Start_Date']].rename(columns={'Terminating_Number':'B Number'})
     ])
 
-    first_last = calls.groupby('B Number').agg(
+    first_last = calls.groupby("B Number").agg(
         First_Call=('Call_Start_Date','min'),
         Last_Call=('Call_Start_Date','max')
     ).reset_index()
 
-    df_final = df_final.merge(first_last, on='B Number', how='left')
-    df_final = df_final.sort_values(by='Count', ascending=False)
+    df_final = df_final.merge(first_last, on="B Number", how="left")
+    df_final = df_final.sort_values("Count", ascending=False)
 
-    # ===== استثناء أول رقم (نفس كود 2) =====
-    if not df_final.empty:
-        top_number = df_final.iloc[0]['B Number']
-        mask = df_final['B Number'] == top_number
-
-        df_final.loc[mask, [
-            'B Full Name','B Address','B_NUMBER_SITE_ADDRESS',
-            'Latitude','Longitude','Map','SMS'
-        ]] = [
-            f"{df.iloc[0].get('A_Number_Details_First_Name','')} {df.iloc[0].get('A_Number_Details_Last_Name','')}",
-            '28607102800033',
-            df.iloc[0].get('MU_Site_Address',''),
-            '', '', '', 0
-        ]
-
-    # ===== IMEI =====
-    def safe_imei(x):
-        try:
-            return str(int(float(x)))
-        except:
-            return ''
-
-    imei_df = df.copy()
-    imei_df['IMEI_Number'] = imei_df['IMEI_Number'].apply(safe_imei)
-
-    imei_summary = imei_df.groupby('IMEI_Number').agg(
-        Count=('IMEI_Number','count'),
-        First_Use_Date=('Call_Start_Date','min'),
-        Last_Use_Date=('Call_Start_Date','max'),
-        First_Use_Address=('Site_Address','first'),
-        Last_Use_Address=('Site_Address','last')
-    ).reset_index()
-
-    imei_summary.rename(columns={'IMEI_Number':'IMEI'}, inplace=True)
-    imei_summary['Device Info'] = imei_summary['IMEI'].apply(
-        lambda x: f'https://www.imei.info/calc/?imei={x}'
-    )
-    imei_summary = imei_summary.sort_values(by='Count', ascending=False)
-
-    # ===== Sites =====
-    site_df = df[['Site_Address','Latitude','Longitude','Call_Start_Date']].copy()
-    site_group = site_df.groupby('Site_Address').agg(
-        Count=('Site_Address','count'),
-        First_Use_Date=('Call_Start_Date','min'),
-        Last_Use_Date=('Call_Start_Date','max'),
-        Latitude=('Latitude','first'),
-        Longitude=('Longitude','first')
-    ).reset_index()
-
-    site_group['Map'] = site_group.apply(
-        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}',
-        axis=1
-    )
-
-    site_group = site_group[['Site_Address','Count','Map','First_Use_Date','Last_Use_Date']]
-    site_group = site_group.sort_values(by='Count', ascending=False)
-
-    # ===== إخراج Streamlit =====
     output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_final.to_excel(writer, sheet_name='calls', index=False)
-        imei_summary.to_excel(writer, sheet_name='imei', index=False)
-        site_group.to_excel(writer, sheet_name='site', index=False)
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_final.to_excel(writer, sheet_name="calls", index=False)
 
     output.seek(0)
     return output
+
+# ================== زر التحليل ==================
+if selected_company == "etisalat" and current_df is not None:
+    if st.button("🔍 تحليل تقرير اتصالات"):
+        with st.spinner("جارٍ التحليل..."):
+            out = generate_etisalat_report(current_df)
+            final_out = format_excel_sheets(out)
+
+        st.success("✅ التقرير جاهز")
+
+        st.download_button(
+            "⬇️ تحميل التقرير",
+            data=final_out,
+            file_name="etisalat_report.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
 def generate_vodafone_report():
     global current_df, current_file
@@ -453,6 +370,7 @@ def generate_orange_report():
     format_sheet(wb["site"], header_color="FF6600", hyperlink_col=3)
     wb.save(output_file)
     messagebox.showinfo("نجاح", f"تم إنشاء تقرير أورانج\nالملف:\n{output_file}")
+
 
 
 
