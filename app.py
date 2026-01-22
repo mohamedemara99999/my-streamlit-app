@@ -77,11 +77,11 @@ if st.session_state.logged_in:
             st.error(f"خطأ في قراءة الملف: {e}")
 
 # ================== دالة تنسيق Excel ==================
-def format_excel_sheets(output):
+def format_excel_sheets(output, header_color="FFFF00"):
     output.seek(0)
     wb = load_workbook(output)
 
-    header_fill = PatternFill("solid", fgColor="228B22")
+    header_fill = PatternFill("solid", fgColor=header_color)
     header_font = Font(bold=True, color="FFFFFF")
 
     for ws in wb.worksheets:
@@ -253,8 +253,8 @@ def generate_vodafone_report(df):
 
     # ===== دمج البيانات =====
     df_final = freq.merge(
-    df2[['B_NUMBER','B Full Name','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','B_NUMBER_NATIONAL_ID']].drop_duplicates(subset='B_NUMBER'),
-    left_on='B Number', right_on='B_NUMBER', how='left'
+        df2[['B_NUMBER','B Full Name','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','B_NUMBER_NATIONAL_ID']].drop_duplicates(subset='B_NUMBER'),
+        left_on='B Number', right_on='B_NUMBER', how='left'
     )
     df_final = df_final.merge(sms_count, left_on='B Number', right_on='B_NUMBER', how='left')
     df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
@@ -269,11 +269,10 @@ def generate_vodafone_report(df):
 
     # ===== ترتيب الأعمدة النهائي مع الأعمدة الجديدة =====
     df_final = df_final[['B Number','Count','B Full Name','B Number id',
-                     'B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS',
-                     'First_Call','Last_Call']]
+                         'B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS',
+                         'First_Call','Last_Call']]
     df_final['Count'] = df_final['Count'].astype(int)
     df_final = df_final.sort_values(by='Count', ascending=False)
-
 
     # ===== تجميع بيانات IMEI =====
     df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
@@ -334,9 +333,9 @@ def generate_orange_report(df):
     df.columns = df.columns.str.upper()  # تحويل كل الأسماء لحروف كبيرة لتوحيد التعامل
     
     required_cols = [
-            'TARGET_MSISDN','TARGET_IMEI','TARGET_IMSI','TARGET_IMEI_TYPE','EVENT_START_TIME',
-            'CALL_DURATION','EVENT_DIRECTION','OTHER_MSISDN','OTHER_NAME','OTHER_ID',
-            'OTHER_ID_TYPE','OTHER_ADDRESS','CELL_ADDRESS','CELL_LAT','CELL_LONG'
+        'TARGET_MSISDN','TARGET_IMEI','TARGET_IMSI','TARGET_IMEI_TYPE','EVENT_START_TIME',
+        'CALL_DURATION','EVENT_DIRECTION','OTHER_MSISDN','OTHER_NAME','OTHER_ID',
+        'OTHER_ID_TYPE','OTHER_ADDRESS','CELL_ADDRESS','CELL_LAT','CELL_LONG'
     ]
     
     # ===== التحقق من الأعمدة =====
@@ -375,6 +374,7 @@ def generate_orange_report(df):
         First_Use_Address=('CELL_ADDRESS','first'),
         Last_Use_Address=('CELL_ADDRESS','last')
     ).reset_index()
+    imei_group['Device Info'] = imei_group['TARGET_IMEI'].apply(lambda x: f'https://www.imei.info_]()
     imei_group['Device Info'] = imei_group['TARGET_IMEI'].apply(lambda x: f'https://www.imei.info/calc/?imei={x}')
     imei_group = imei_group[['TARGET_IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
     imei_group.columns = ['IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']
@@ -393,7 +393,7 @@ def generate_orange_report(df):
                                     if pd.notna(row["LAT"]) and pd.notna(row["LON"]) else '', axis=1)
     site_df = site_df[['CELL_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
     site_df = site_df.sort_values(by='Count', ascending=False)
-    
+
     # ===== حفظ Excel في BytesIO =====
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -411,7 +411,7 @@ if current_df is not None:
     col1, col2, col3 = st.columns(3)  # ثلاثة أعمدة للتقارير الثلاثة
     with col1:
         if st.button("تقرير اتصالات"):
-            output = generate_etisalat_report(current_df)
+            output = generate_etisalat_report(current_df, original_df)
             if output:
                 st.download_button(
                     label="تحميل تقرير اتصالات",
@@ -439,4 +439,3 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
