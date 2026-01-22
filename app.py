@@ -362,6 +362,12 @@ def generate_orange_report(df):
     calls_df['B Number'] = calls_df['B Number'].apply(str)
     calls_df['B Number id'] = calls_df['B Number id'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
     calls_df['Count'] = calls_df['Count'].astype(int)
+    
+    # ===== First / Last Call =====
+    df['EVENT_START_TIME'] = pd.to_datetime(df['EVENT_START_TIME'], errors='coerce')
+    call_dates = df.groupby('OTHER_MSISDN')['EVENT_START_TIME'].agg(First_Call='min', Last_Call='max').reset_index()
+    calls_df = calls_df.merge(call_dates, left_on='B Number', right_on='OTHER_MSISDN', how='left').drop(columns='OTHER_MSISDN')
+
     calls_df = calls_df.sort_values(by='Count', ascending=False)
     
     # ===== بيانات IMEI =====
@@ -393,14 +399,15 @@ def generate_orange_report(df):
     site_df = site_df[['CELL_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
     site_df = site_df.sort_values(by='Count', ascending=False)
 
-    # ===== حفظ Excel في BytesIO =====
+    # ===== حفظ Excel في BytesIO مع صفحة الشيت الأصلي =====
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         calls_df.to_excel(writer, sheet_name="calls", index=False)
         imei_group.to_excel(writer, sheet_name="imei", index=False)
         site_df.to_excel(writer, sheet_name="site", index=False)
-    output.seek(0)
+        df.to_excel(writer, sheet_name="cheet", index=False)  # <-- الصفحة الرابعة كاملة
 
+    output.seek(0)
     final_output = format_excel_sheets(output, header_color="FF6600")
     return final_output
 
@@ -438,4 +445,5 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
