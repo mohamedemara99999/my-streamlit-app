@@ -77,20 +77,30 @@ if st.session_state.logged_in:
             st.error(f"خطأ في قراءة الملف: {e}")
 
 # ================== دالة تنسيق Excel ==================
-def format_excel_sheets(output, header_color="FFFF00"):
+def format_excel_sheets(output):
     output.seek(0)
     wb = load_workbook(output)
 
-    header_fill = PatternFill("solid", fgColor=header_color)
+    header_fill = PatternFill("solid", fgColor="00FF00")  # الهيدر أخضر
     header_font = Font(bold=True, color="FFFFFF")
 
+    first_row_fill_calls = PatternFill("solid", fgColor="FFFF00")  # أول صف في calls أصفر
+    first_row_font_calls = Font(bold=True, color="000000")  # خط أسود
+
     for ws in wb.worksheets:
+        # ===== الهيدر لكل الشيتات =====
         for cell in ws[1]:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center")
 
-        # تحويل أي روابط هايبرلينك
+        # ===== أول صف في شيت calls فقط =====
+        if ws.title.lower() == "calls" and ws.max_row > 1:
+            for cell in ws[2]:  # الصف الثاني في Excel = أول صف بعد الهيدر
+                cell.fill = first_row_fill_calls
+                cell.font = first_row_font_calls
+
+        # ===== روابط هايبرلينك =====
         for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
             for cell in row:
                 if isinstance(cell.value, str) and cell.value.startswith("http"):
@@ -105,6 +115,7 @@ def format_excel_sheets(output, header_color="FFFF00"):
     wb.save(final)
     final.seek(0)
     return final
+
 
 # ================== تقرير اتصالات ==================
 def generate_etisalat_report(df, original_df):
@@ -445,5 +456,6 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
