@@ -240,116 +240,102 @@ if st.session_state.logged_in and uploaded_file is not None and selected_company
 
 
 # ================== دالة فودافون ==================
-def generate_vodafone_report(df, original_df):
-    import pandas as pd
-    from io import BytesIO
+def generate_vodafone_report(df):
+    required_cols = [
+        'B_NUMBER','B_NUMBER_FIRST_NAME','B_NUMBER_LAST_NAME','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS',
+        'B_NUMBER_NATIONAL_ID','IMEI','HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME',
+        'FULL_DATE','SITE_ADDRESS','LATITUDE','LONGITUDE','SERVICE'
+    ]
+    for col in required_cols:
+        if col not in df.columns:
+            st.error(f"العمود {col} غير موجود في الملف")
+            return None
 
-    df = df.copy()
-    df.fillna('', inplace=True)  # تجنب القيم الفارغة
-    df['B_NUMBER'] = df['B_NUMBER'].astype(str)
-
-    # ===== B Full Name =====
-    df['B Full Name'] = df['B_NUMBER_FIRST_NAME'] + ' ' + df['B_NUMBER_LAST_NAME']
-
-    # ===== تكرار الأرقام =====
-    numbers = df['B_NUMBER']
+    df2 = df.copy()
+    df2['B Full Name'] = df2['B_NUMBER_FIRST_NAME'].fillna('') + ' ' + df2['B_NUMBER_LAST_NAME'].fillna('')
+    df2['IMEI'] = df2['IMEI'].astype(str)
+    numbers = df2['B_NUMBER'].astype(str)
     freq = numbers.value_counts().reset_index()
     freq.columns = ['B Number','Count']
 
-    # ===== SMS =====
-    sms_count = df[df['SERVICE'].astype(str).str.strip().isin(["Short message MO/PP","Short message MT/PP"])]
-    sms_count = sms_count.groupby('B_NUMBER').size().reset_index(name='SMS')
+    # ===== حساب SMS =====
+    sms_count = df2[df2['SERVICE'].astype(str).str.strip().isin(["Short message MO/PP","Short message MT/PP"])].groupby('B_NUMBER').size().reset_index(name='SMS')
 
     # ===== دمج البيانات =====
     df_final = freq.merge(
-        df[['B_NUMBER','B Full Name','B_NUMBER_NATIONAL_ID','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS']].drop_duplicates(subset='B_NUMBER'),
+        df2[['B_NUMBER','B Full Name','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','B_NUMBER_NATIONAL_ID']].drop_duplicates(subset='B_NUMBER'),
         left_on='B Number', right_on='B_NUMBER', how='left'
     )
     df_final = df_final.merge(sms_count, left_on='B Number', right_on='B_NUMBER', how='left')
     df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
-    df_final['B Number Id'] = df_final['B_NUMBER_NATIONAL_ID'].astype(str)
 
-    # ===== First / Last Call =====
-    df['FULL_DATE'] = pd.to_datetime(df['FULL_DATE'], errors='coerce')
-    call_dates = df.groupby('B_NUMBER')['FULL_DATE'].agg(First_Call='min', Last_Call='max').reset_index()
-    df_final = df_final.merge(call_dates, left_on='B Number', right_on='B_NUMBER', how='left')
-    df_final = df_final.drop(columns=['B_NUMBER'])
+    # ===== إضافة B Number id بعد B Full Name =====
+    df_final['B Number id'] = df_final['B_NUMBER_NATIONAL_ID'].astype(str)
 
-    # ترتيب الأعمدة
-    df_final = df_final[['B Number','Count','B Full Name','B Number Id','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS','First_Call','Last_Call']]
+    # ===== ترتيب الأعمدة النهائي =====
+    df_final = df_final[['B Number','Count','B Full Name','B Number id','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS']]
+    df_final['Count'] = df_final['Count'].astype(int)
     df_final = df_final.sort_values(by='Count', ascending=False)
 
-    # ===== IMEI =====
-    df['IMEI'] = df['IMEI'].apply(lambda x: str(int(x)) if str(x).strip() != '' else '')
-    imei_group = df.groupby('IMEI').agg(
+    # ===== تجميع بيانات IMEI =====
+    df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
+    imei_group = df2.groupby('IMEI').agg(
         Count=('IMEI','count'),
-        Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}' if x.iloc[0] != '' else ''),
+        Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}'),
         HANDSET_MANUFACTURER=('HANDSET_MANUFACTURER','first'),
         HANDSET_MARKETING_NAME=('HANDSET_MARKETING_NAME','first'),
         First_Use_Date=('FULL_DATE','min'),
         Last_Use_Date=('FULL_DATE','max')
     ).reset_index()
 
+    # ===== أول وآخر عنوان لكل IMEI =====
     first_last_addr = []
     for imei in imei_group['IMEI']:
-        sub = df[df['IMEI']==imei].sort_values('FULL_DATE')
-        if not sub.empty:
-            first_addr = sub.iloc[0]['SITE_ADDRESS']
-            last_addr = sub.iloc[-1]['SITE_ADDRESS']
-        else:
-            first_addr = last_addr = ''
+        sub = df2[df2['IMEI']==imei].sort_values('FULL_DATE')
+        first_addr = sub.iloc[0]['SITE_ADDRESS']
+        last_addr = sub.iloc[-1]['SITE_ADDRESS']
         first_last_addr.append((first_addr,last_addr))
     imei_group['First_Use_Address'] = [x[0] for x in first_last_addr]
     imei_group['Last_Use_Address'] = [x[1] for x in first_last_addr]
 
     imei_group = imei_group[['IMEI','Count','Device_Info','HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME',
                              'First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
+    imei_group['Count'] = imei_group['Count'].astype(int)
     imei_group = imei_group.sort_values(by='Count', ascending=False)
 
-    # ===== Sites =====
-    site_df = df[['SITE_ADDRESS','LATITUDE','LONGITUDE','FULL_DATE']].copy()
+    # ===== تجميع بيانات المواقع =====
+    site_df = df2[['SITE_ADDRESS','LATITUDE','LONGITUDE','FULL_DATE']].copy()
     site_group = site_df.groupby('SITE_ADDRESS').agg(
         Count=('SITE_ADDRESS','count'),
+        Map=('LATITUDE', lambda x: f'https://www.google.com/maps/search/?api=1&query={x.iloc[0]},{site_df.loc[x.index[0],"LONGITUDE"]}'),
         First_Use_Date=('FULL_DATE','min'),
-        Last_Use_Date=('FULL_DATE','max'),
-        Latitude=('LATITUDE','first'),
-        Longitude=('LONGITUDE','first')
+        Last_Use_Date=('FULL_DATE','max')
     ).reset_index()
-    site_group['Map'] = site_group.apply(
-        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}' 
-                  if r["Latitude"] != '' and r["Longitude"] != '' else '', axis=1
-    )
-    site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']].sort_values(by='Count', ascending=False)
+    site_group['Count'] = site_group['Count'].astype(int)
+    site_group = site_group.sort_values(by='Count', ascending=False)
+    site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
 
-    # ===== إخراج Excel مع شيت cheet =====
+    # ===== حفظ Excel في BytesIO =====
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_final.to_excel(writer, sheet_name='calls', index=False)
-        imei_group.to_excel(writer, sheet_name='imei', index=False)
-        site_group.to_excel(writer, sheet_name='site', index=False)
-        original_df.to_excel(writer, sheet_name='cheet', index=False)
-
+        df_final.to_excel(writer, sheet_name="calls", index=False)
+        imei_group.to_excel(writer, sheet_name="imei", index=False)
+        site_group.to_excel(writer, sheet_name="site", index=False)
     output.seek(0)
-    return format_excel_sheets(output, header_color="FF0000")
-# بعد فتح الملف ورفع current_df و original_df
-st.session_state.current_df = current_df
-st.session_state.original_df = original_df
 
-if st.session_state.logged_in and uploaded_file is not None and selected_company == "vodafone":
-    if st.button("تحليل ملف فودافون"):
-        if st.session_state.current_df is not None and st.session_state.original_df is not None:
-            result = generate_vodafone_report(
-                st.session_state.current_df,
-                st.session_state.original_df
-            )
-            st.download_button(
-                "تحميل تقرير فودافون",
-                data=result,
-                file_name="vodafone_report.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        else:
-           st.error("❌ لم يتم رفع ملف صالح للفودافون")
+    # ===== تحقق من النوع قبل التنسيف =====
+    if output is None:
+        st.error("حدث خطأ: الملف غير موجود")
+        return None
+
+    # ===== تطبيق التنسيقات =====
+    try:
+        final_output = format_excel_sheets(output, header_color="FF0000")
+    except Exception as e:
+        st.error(f"خطأ في تطبيق التنسيقات: {e}")
+        return output  # نرجع الملف الخام بدل ما يقف
+
+    return final_output
 
 
 # ================== أورانج ==================
@@ -445,6 +431,7 @@ def generate_orange_report():
     format_sheet(wb["site"], header_color="FF6600", hyperlink_col=3)
     wb.save(output_file)
     messagebox.showinfo("نجاح", f"تم إنشاء تقرير أورانج\nالملف:\n{output_file}")
+
 
 
 
