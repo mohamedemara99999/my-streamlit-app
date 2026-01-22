@@ -255,7 +255,7 @@ def generate_vodafone_report(df):
     df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
     df_final['B Number id'] = df_final['B_NUMBER_NATIONAL_ID'].astype(str)
 
-    # ===== ترتيب الأعمدة النهائي =====
+    # ===== ترتيب الأعمدة النهائي مع First_Call و Last_Call =====
     df_final = df_final[['B Number','Count','B Full Name','B Number id',
                          'B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS',
                          'First_Call','Last_Call']]
@@ -263,6 +263,7 @@ def generate_vodafone_report(df):
     df_final = df_final.sort_values(by='Count', ascending=False)
 
     # ===== تجميع بيانات IMEI =====
+    df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
     imei_group = df2.groupby('IMEI').agg(
         Count=('IMEI','count'),
         Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}'),
@@ -315,4 +316,6 @@ def generate_vodafone_report(df):
         return output
 
     return final_output
+
+
 
