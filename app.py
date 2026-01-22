@@ -248,8 +248,19 @@ def generate_vodafone_report(df):
     df_final['Count'] = df_final['Count'].astype(int)
     df_final = df_final.sort_values(by='Count', ascending=False)
 
+    # ===== First Call / Last Call =====
+    df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'], errors='coerce')
+    calls_df = pd.concat([
+        df2[['B_NUMBER','FULL_DATE']].rename(columns={'B_NUMBER':'B Number'}),
+    ])
+    first_last = calls_df.groupby('B Number').agg(
+        First_Call=('FULL_DATE','min'),
+        Last_Call=('FULL_DATE','max')
+    ).reset_index()
+
+    df_final = df_final.merge(first_last, on='B Number', how='left')
+
     # ===== تجميع بيانات IMEI =====
-    df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
     imei_group = df2.groupby('IMEI').agg(
         Count=('IMEI','count'),
         Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}'),
@@ -286,12 +297,14 @@ def generate_vodafone_report(df):
     site_group = site_group.sort_values(by='Count', ascending=False)
     site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
 
-    # ===== حفظ Excel في BytesIO =====
+    # ===== حفظ Excel في BytesIO مع شيت cheet =====
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_final.to_excel(writer, sheet_name="calls", index=False)
         imei_group.to_excel(writer, sheet_name="imei", index=False)
         site_group.to_excel(writer, sheet_name="site", index=False)
+        df2.to_excel(writer, sheet_name="cheet", index=False)  # الشيت الأصلي
+
     output.seek(0)
 
     # ===== تطبيق التنسيقات =====
@@ -302,29 +315,6 @@ def generate_vodafone_report(df):
         return output
 
     return final_output
-
-# ================== أزرار التحليل ==================
-if st.session_state.logged_in and uploaded_file is not None:
-    if selected_company == "etisalat":
-        if st.button("تحليل الملف - اتصالات"):
-            result = generate_etisalat_report(current_df, original_df)
-            if result:
-                st.download_button(
-                    "تحميل تقرير اتصالات",
-                    data=result,
-                    file_name="etisalat_report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-    elif selected_company == "vodafone":
-        if st.button("تحليل الملف - فودافون"):
-            result = generate_vodafone_report(current_df)
-            if result:
-                st.download_button(
-                    "تحميل تقرير فودافون",
-                    data=result,
-                    file_name="vodafone_report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
 
 # ================== أورانج ==================
 def generate_orange_report():
@@ -419,6 +409,7 @@ def generate_orange_report():
     format_sheet(wb["site"], header_color="FF6600", hyperlink_col=3)
     wb.save(output_file)
     messagebox.showinfo("نجاح", f"تم إنشاء تقرير أورانج\nالملف:\n{output_file}")
+
 
 
 
