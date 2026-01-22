@@ -241,11 +241,15 @@ if st.session_state.logged_in and uploaded_file is not None and selected_company
 
 # ================== دالة فودافون ==================
 def generate_vodafone_report(df, original_df):
+    import pandas as pd
+    from io import BytesIO
+
     df = df.copy()
+    df.fillna('', inplace=True)  # تجنب القيم الفارغة
     df['B_NUMBER'] = df['B_NUMBER'].astype(str)
 
     # ===== B Full Name =====
-    df['B Full Name'] = df['B_NUMBER_FIRST_NAME'].fillna('') + ' ' + df['B_NUMBER_LAST_NAME'].fillna('')
+    df['B Full Name'] = df['B_NUMBER_FIRST_NAME'] + ' ' + df['B_NUMBER_LAST_NAME']
 
     # ===== تكرار الأرقام =====
     numbers = df['B_NUMBER']
@@ -263,7 +267,7 @@ def generate_vodafone_report(df, original_df):
     )
     df_final = df_final.merge(sms_count, left_on='B Number', right_on='B_NUMBER', how='left')
     df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
-    df_final['B Number Id'] = df_final['B_NUMBER_NATIONAL_ID'].apply(str)
+    df_final['B Number Id'] = df_final['B_NUMBER_NATIONAL_ID'].astype(str)
 
     # ===== First / Last Call =====
     df['FULL_DATE'] = pd.to_datetime(df['FULL_DATE'], errors='coerce')
@@ -276,10 +280,10 @@ def generate_vodafone_report(df, original_df):
     df_final = df_final.sort_values(by='Count', ascending=False)
 
     # ===== IMEI =====
-    df['IMEI'] = df['IMEI'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
+    df['IMEI'] = df['IMEI'].apply(lambda x: str(int(x)) if str(x).strip() != '' else '')
     imei_group = df.groupby('IMEI').agg(
         Count=('IMEI','count'),
-        Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}'),
+        Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}' if x.iloc[0] != '' else ''),
         HANDSET_MANUFACTURER=('HANDSET_MANUFACTURER','first'),
         HANDSET_MARKETING_NAME=('HANDSET_MARKETING_NAME','first'),
         First_Use_Date=('FULL_DATE','min'),
@@ -289,8 +293,11 @@ def generate_vodafone_report(df, original_df):
     first_last_addr = []
     for imei in imei_group['IMEI']:
         sub = df[df['IMEI']==imei].sort_values('FULL_DATE')
-        first_addr = sub.iloc[0]['SITE_ADDRESS']
-        last_addr = sub.iloc[-1]['SITE_ADDRESS']
+        if not sub.empty:
+            first_addr = sub.iloc[0]['SITE_ADDRESS']
+            last_addr = sub.iloc[-1]['SITE_ADDRESS']
+        else:
+            first_addr = last_addr = ''
         first_last_addr.append((first_addr,last_addr))
     imei_group['First_Use_Address'] = [x[0] for x in first_last_addr]
     imei_group['Last_Use_Address'] = [x[1] for x in first_last_addr]
@@ -309,11 +316,12 @@ def generate_vodafone_report(df, original_df):
         Longitude=('LONGITUDE','first')
     ).reset_index()
     site_group['Map'] = site_group.apply(
-        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}', axis=1
+        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}' 
+                  if r["Latitude"] != '' and r["Longitude"] != '' else '', axis=1
     )
     site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']].sort_values(by='Count', ascending=False)
 
-    # ===== إخراج Excel =====
+    # ===== إخراج Excel مع شيت cheet =====
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_final.to_excel(writer, sheet_name='calls', index=False)
@@ -323,17 +331,25 @@ def generate_vodafone_report(df, original_df):
 
     output.seek(0)
     return format_excel_sheets(output, header_color="FF0000")
+# بعد فتح الملف ورفع current_df و original_df
+st.session_state.current_df = current_df
+st.session_state.original_df = original_df
 
-# ================== زر التحليل بعد اتصالات ==================
 if st.session_state.logged_in and uploaded_file is not None and selected_company == "vodafone":
     if st.button("تحليل ملف فودافون"):
-        result = generate_vodafone_report(current_df, original_df)
-        st.download_button(
-            "تحميل تقرير فودافون",
-            data=result,
-            file_name="vodafone_report.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        if st.session_state.current_df is not None and st.session_state.original_df is not None:
+            result = generate_vodafone_report(
+                st.session_state.current_df,
+                st.session_state.original_df
+            )
+            st.download_button(
+                "تحميل تقرير فودافون",
+                data=result,
+                file_name="vodafone_report.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        else:
+            st.error("❌ لم يتم رفع ملف صالح للفودافون"
 
 
 # ================== أورانج ==================
@@ -429,6 +445,7 @@ def generate_orange_report():
     format_sheet(wb["site"], header_color="FF6600", hyperlink_col=3)
     wb.save(output_file)
     messagebox.showinfo("نجاح", f"تم إنشاء تقرير أورانج\nالملف:\n{output_file}")
+
 
 
 
