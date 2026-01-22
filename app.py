@@ -374,7 +374,6 @@ def generate_orange_report(df):
         First_Use_Address=('CELL_ADDRESS','first'),
         Last_Use_Address=('CELL_ADDRESS','last')
     ).reset_index()
-    imei_group['Device Info'] = imei_group['TARGET_IMEI'].apply(lambda x: f'https://www.imei.info_]()
     imei_group['Device Info'] = imei_group['TARGET_IMEI'].apply(lambda x: f'https://www.imei.info/calc/?imei={x}')
     imei_group = imei_group[['TARGET_IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
     imei_group.columns = ['IMEI','Count','TARGET_IMEI_TYPE','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']
@@ -439,3 +438,4 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
