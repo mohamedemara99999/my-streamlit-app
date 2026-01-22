@@ -125,98 +125,102 @@ def format_excel_sheets(output, header_color="228B22", highlight_row=None, highl
     final_output.seek(0)
     return final_output
 
-def generate_etisalat_report():
-    global current_df, current_file
-    if current_df is None:
-        messagebox.showinfo("مطلوب", "افتح ملف Excel أولاً")
-        return
-
-    import os
+def generate_etisalat_report(df):
     import pandas as pd
-    from openpyxl import load_workbook
-    from openpyxl.styles import PatternFill
+    from io import BytesIO
 
     # ===== تنظيف الأعمدة =====
-    current_df.columns = current_df.columns.str.strip()
-    current_df['Originating_Number'] = current_df['Originating_Number'].astype(str)
-    current_df['Terminating_Number'] = current_df['Terminating_Number'].astype(str)
+    df = df.copy()
+    df.columns = df.columns.str.strip()
+    df['Originating_Number'] = df['Originating_Number'].astype(str)
+    df['Terminating_Number'] = df['Terminating_Number'].astype(str)
 
-    # ===== حساب تكرار الأرقام =====
-    numbers = pd.concat([current_df['Originating_Number'], current_df['Terminating_Number']])
+    # ===== حساب تكرار الأرقام (من الطرفين) =====
+    numbers = pd.concat([df['Originating_Number'], df['Terminating_Number']])
     freq = numbers.value_counts().reset_index()
     freq.columns = ['B Number', 'Count']
-
     df_final = freq.copy()
 
-    # ===== إنشاء dictionary للبيانات لكل رقم =====
-    b_data_dict = {}
-    for _, row in current_df.iterrows():
-        for num_col in ['Originating_Number', 'Terminating_Number']:
-            num = str(row[num_col])
-            if num not in b_data_dict:
-                b_data_dict[num] = {
-                    'B Full Name': row['B_Number_Full_Name'],
-                    'B Address': row['B_Number_Address'],
-                    'B_NUMBER_SITE_ADDRESS': row['B_Number_MU_Site_Address'],
-                    'Latitude': row['B_Number_MU_Latitude'],
-                    'Longitude': row['B_Number_MU_Longitude']
+    # ===== dictionary لربط أي رقم ببياناته =====
+    b_data = {}
+    for _, row in df.iterrows():
+        for col in ['Originating_Number', 'Terminating_Number']:
+            num = str(row[col])
+            if num not in b_data:
+                b_data[num] = {
+                    'B Full Name': row.get('B_Number_Full_Name', ''),
+                    'B Address': row.get('B_Number_Address', ''),
+                    'B_NUMBER_SITE_ADDRESS': row.get('B_Number_MU_Site_Address', ''),
+                    'Latitude': row.get('B_Number_MU_Latitude', ''),
+                    'Longitude': row.get('B_Number_MU_Longitude', '')
                 }
 
-    # ===== إضافة الأعمدة للـ df_final =====
-    df_final['B Full Name'] = df_final['B Number'].map(lambda x: b_data_dict[x]['B Full Name'] if x in b_data_dict else '')
-    df_final['B Address'] = df_final['B Number'].map(lambda x: b_data_dict[x]['B Address'] if x in b_data_dict else '')
-    df_final['B_NUMBER_SITE_ADDRESS'] = df_final['B Number'].map(lambda x: b_data_dict[x]['B_NUMBER_SITE_ADDRESS'] if x in b_data_dict else '')
-    df_final['Latitude'] = df_final['B Number'].map(lambda x: b_data_dict[x]['Latitude'] if x in b_data_dict else '')
-    df_final['Longitude'] = df_final['B Number'].map(lambda x: b_data_dict[x]['Longitude'] if x in b_data_dict else '')
+    for col in ['B Full Name','B Address','B_NUMBER_SITE_ADDRESS','Latitude','Longitude']:
+        df_final[col] = df_final['B Number'].map(lambda x: b_data[x][col] if x in b_data else '')
 
-    # ===== خانات Map =====
+    # ===== Map =====
     df_final['Map'] = df_final.apply(
-        lambda row: f'=HYPERLINK("https://www.google.com/maps/search/?api=1&query={row["Latitude"]},{row["Longitude"]}","Map")'
-        if pd.notna(row['Latitude']) and pd.notna(row['Longitude']) else '', axis=1
+        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}'
+        if pd.notna(r['Latitude']) and pd.notna(r['Longitude']) and r['Latitude'] != '' else '',
+        axis=1
     )
 
-    # ===== حساب SMS من Originating_Number =====
-    temp_df = current_df.copy()
+    # ===== SMS (من Originating فقط – زي كود 2 بالظبط) =====
+    temp_df = df.copy()
     temp_df['activity_clean'] = temp_df['Network_Activity_Type_Name'].astype(str).str.strip()
-    activity_stats = temp_df.groupby('Originating_Number').agg(
-        SMS=('activity_clean', lambda x: (x=="SMS").sum())
+    sms_stats = temp_df.groupby('Originating_Number').agg(
+        SMS=('activity_clean', lambda x: (x == 'SMS').sum())
     ).reset_index()
-    df_final = df_final.merge(activity_stats, left_on='B Number', right_on='Originating_Number', how='left')
-    df_final.drop(columns=['Originating_Number'], inplace=True)
+
+    df_final = df_final.merge(
+        sms_stats, left_on='B Number', right_on='Originating_Number', how='left'
+    ).drop(columns='Originating_Number')
+
     df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
     df_final['Count'] = df_final['Count'].astype(int)
 
-    # ===== حساب أول وآخر مكالمة لكل B Number =====
+    # ===== First / Last Call (من الطرفين) =====
     temp_df['Call_Start_Date'] = pd.to_datetime(temp_df['Call_Start_Date'])
-    call_records = pd.concat([
-        temp_df[['Originating_Number','Call_Start_Date']].rename(columns={'Originating_Number':'B Number'}),
-        temp_df[['Terminating_Number','Call_Start_Date']].rename(columns={'Terminating_Number':'B Number'})
+    calls = pd.concat([
+        temp_df[['Originating_Number','Call_Start_Date']]
+            .rename(columns={'Originating_Number':'B Number'}),
+        temp_df[['Terminating_Number','Call_Start_Date']]
+            .rename(columns={'Terminating_Number':'B Number'})
     ])
-    first_last_call = call_records.groupby('B Number').agg(
+
+    first_last = calls.groupby('B Number').agg(
         First_Call=('Call_Start_Date','min'),
         Last_Call=('Call_Start_Date','max')
     ).reset_index()
-    df_final = df_final.merge(first_last_call, on='B Number', how='left')
 
+    df_final = df_final.merge(first_last, on='B Number', how='left')
     df_final = df_final.sort_values(by='Count', ascending=False)
 
-    # ===== استثناء الصف الأول الأكثر تكرار =====
-    if len(df_final) >= 1:
-        target_number = freq.iloc[0]['B Number']
-        mask = df_final['B Number'] == target_number
-        df_final.loc[mask, ['B Full Name','B Address','B_NUMBER_SITE_ADDRESS','Latitude','Longitude','Map','SMS']] = \
-            f"{current_df.at[0,'A_Number_Details_First_Name']} {current_df.at[0,'A_Number_Details_Last_Name']}", \
-            '28607102800033', current_df.at[0,'MU_Site_Address'], '', '', '', 0
+    # ===== استثناء أول رقم (نفس كود 2) =====
+    if not df_final.empty:
+        top_number = df_final.iloc[0]['B Number']
+        mask = df_final['B Number'] == top_number
 
-    # ===== معالجة IMEI =====
+        df_final.loc[mask, [
+            'B Full Name','B Address','B_NUMBER_SITE_ADDRESS',
+            'Latitude','Longitude','Map','SMS'
+        ]] = [
+            f"{df.iloc[0].get('A_Number_Details_First_Name','')} {df.iloc[0].get('A_Number_Details_Last_Name','')}",
+            '28607102800033',
+            df.iloc[0].get('MU_Site_Address',''),
+            '', '', '', 0
+        ]
+
+    # ===== IMEI =====
     def safe_imei(x):
         try:
             return str(int(float(x)))
         except:
             return ''
 
-    imei_df = current_df.copy()
+    imei_df = df.copy()
     imei_df['IMEI_Number'] = imei_df['IMEI_Number'].apply(safe_imei)
+
     imei_summary = imei_df.groupby('IMEI_Number').agg(
         Count=('IMEI_Number','count'),
         First_Use_Date=('Call_Start_Date','min'),
@@ -224,49 +228,40 @@ def generate_etisalat_report():
         First_Use_Address=('Site_Address','first'),
         Last_Use_Address=('Site_Address','last')
     ).reset_index()
+
     imei_summary.rename(columns={'IMEI_Number':'IMEI'}, inplace=True)
     imei_summary['Device Info'] = imei_summary['IMEI'].apply(
-        lambda x: f'=HYPERLINK("https://www.imei.info/calc/?imei={x}","IMEI Info")'
+        lambda x: f'https://www.imei.info/calc/?imei={x}'
     )
-    imei_summary = imei_summary[['IMEI','Count','Device Info','First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
-    imei_summary['Count'] = imei_summary['Count'].astype(int)
     imei_summary = imei_summary.sort_values(by='Count', ascending=False)
 
-    # ===== معالجة المواقع =====
-    site_df = current_df[['Site_Address','Latitude','Longitude','Call_Start_Date']].copy()
+    # ===== Sites =====
+    site_df = df[['Site_Address','Latitude','Longitude','Call_Start_Date']].copy()
     site_group = site_df.groupby('Site_Address').agg(
         Count=('Site_Address','count'),
-        Map=('Latitude', lambda x: f'=HYPERLINK("https://www.google.com/maps/search/?api=1&query={x.iloc[0]},{site_df.loc[x.index[0],"Longitude"]}","Map")'),
         First_Use_Date=('Call_Start_Date','min'),
-        Last_Use_Date=('Call_Start_Date','max')
+        Last_Use_Date=('Call_Start_Date','max'),
+        Latitude=('Latitude','first'),
+        Longitude=('Longitude','first')
     ).reset_index()
-    site_group['Count'] = site_group['Count'].astype(int)
-    site_group = site_group.sort_values(by='Count', ascending=False)
+
+    site_group['Map'] = site_group.apply(
+        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}',
+        axis=1
+    )
+
     site_group = site_group[['Site_Address','Count','Map','First_Use_Date','Last_Use_Date']]
+    site_group = site_group.sort_values(by='Count', ascending=False)
 
-    # ===== تصدير الملف النهائي =====
-    output_file = os.path.join(os.path.dirname(current_file), "etisalat_report.xlsx")
-    with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-        df_final.to_excel(writer, sheet_name="calls", index=False)
-        imei_summary.to_excel(writer, sheet_name="imei", index=False)
-        site_group.to_excel(writer, sheet_name="site", index=False)
-        current_df.to_excel(writer, sheet_name="cheet", index=False)
+    # ===== إخراج Streamlit =====
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_final.to_excel(writer, sheet_name='calls', index=False)
+        imei_summary.to_excel(writer, sheet_name='imei', index=False)
+        site_group.to_excel(writer, sheet_name='site', index=False)
 
-    # ===== تظليل الصف الأول بالأصفر =====
-    wb = load_workbook(output_file)
-    ws_calls = wb["calls"]
-    yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-    for cell in ws_calls[2]:
-        cell.fill = yellow_fill
-
-    # ===== تنسيق الأوراق (نفترض format_sheet موجودة) =====
-    format_sheet(wb["calls"], header_color="228B22", hyperlink_col=8)
-    format_sheet(wb["imei"], header_color="228B22", hyperlink_col=3)
-    format_sheet(wb["site"], header_color="228B22", hyperlink_col=3)
-
-    wb.save(output_file)
-    messagebox.showinfo("نجاح", f"تم إنشاء تقرير اتصالات\nالملف:\n{output_file}")
-
+    output.seek(0)
+    return output
 
 def generate_vodafone_report():
     global current_df, current_file
@@ -458,6 +453,7 @@ def generate_orange_report():
     format_sheet(wb["site"], header_color="FF6600", hyperlink_col=3)
     wb.save(output_file)
     messagebox.showinfo("نجاح", f"تم إنشاء تقرير أورانج\nالملف:\n{output_file}")
+
 
 
 
