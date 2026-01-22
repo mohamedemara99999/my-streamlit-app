@@ -232,8 +232,8 @@ def generate_etisalat_report(df, original_df):
         original_df.to_excel(writer, sheet_name='cheet', index=False)    # 👈 الشيت الأصلي
 
    output.seek(0)
-   final_output = format_excel_sheets(output, header_color="006400", highlight_first_row=True)
-   return final_output
+final_output = format_excel_sheets(output, header_color="006400", highlight_first_row=True)
+return final_output
 
 # ================== تقرير فودافون ==================
 from io import BytesIO
@@ -450,6 +450,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
