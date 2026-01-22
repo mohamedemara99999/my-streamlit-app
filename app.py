@@ -349,7 +349,7 @@ if st.session_state.logged_in and uploaded_file is not None and selected_company
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         else:
-            st.error("❌ لم يتم رفع ملف صالح للفودافون"
+           st.error("❌ لم يتم رفع ملف صالح للفودافون")
 
 
 # ================== أورانج ==================
@@ -445,6 +445,7 @@ def generate_orange_report():
     format_sheet(wb["site"], header_color="FF6600", hyperlink_col=3)
     wb.save(output_file)
     messagebox.showinfo("نجاح", f"تم إنشاء تقرير أورانج\nالملف:\n{output_file}")
+
 
 
 
