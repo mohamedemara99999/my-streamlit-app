@@ -81,7 +81,7 @@ def format_excel_sheets(output):
     output.seek(0)
     wb = load_workbook(output)
 
-    header_fill = PatternFill("solid", fgColor="00FF00")  # الهيدر أخضر
+    header_fill = PatternFill("solid", fgColor="006400")  # الهيدر أخضر غامق
     header_font = Font(bold=True, color="FFFFFF")
 
     first_row_fill_calls = PatternFill("solid", fgColor="FFFF00")  # أول صف في calls أصفر
@@ -115,7 +115,6 @@ def format_excel_sheets(output):
     wb.save(final)
     final.seek(0)
     return final
-
 
 # ================== تقرير اتصالات ==================
 def generate_etisalat_report(df, original_df):
@@ -456,6 +455,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
