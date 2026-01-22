@@ -57,6 +57,30 @@ if st.session_state.logged_in:
                 current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
             else:
                 current_df = pd.read_excel(uploaded_file, engine="openpyxl")
+# ================== أزرار التحليل ==================
+if st.session_state.logged_in and uploaded_file is not None:
+    if selected_company == "etisalat":
+        if st.button("تحليل الملف - اتصالات"):
+            result = generate_etisalat_report(current_df, original_df)
+            if result:
+                st.download_button(
+                    "تحميل تقرير اتصالات",
+                    data=result,
+                    file_name="etisalat_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+    elif selected_company == "vodafone":
+        if st.button("تحليل الملف - فودافون"):
+            with st.spinner("جارٍ تحليل البيانات..."):
+                result = generate_vodafone_report(current_df)
+                if result:
+                    st.success("تم التحليل بنجاح!")
+                    st.download_button(
+                        "تحميل تقرير فودافون",
+                        data=result,
+                        file_name="vodafone_report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
 
             # ===== حفظ نسخة أصلية قبل أي تعديل =====
             original_df = current_df.copy()
@@ -409,6 +433,7 @@ def generate_orange_report():
     format_sheet(wb["site"], header_color="FF6600", hyperlink_col=3)
     wb.save(output_file)
     messagebox.showinfo("نجاح", f"تم إنشاء تقرير أورانج\nالملف:\n{output_file}")
+
 
 
 
