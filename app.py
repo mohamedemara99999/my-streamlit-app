@@ -334,7 +334,7 @@ def generate_vodafone_report(df):
 
     # ===== تطبيق التنسيقات والهايبرلينك =====
     output.seek(0)
-   final_output = format_excel_sheets(output, header_color="FF0000", company="vodafone")
+    final_output = format_excel_sheets(output, header_color="FF0000", company="vodafone")
 
 # ================== تقرير أورانج ==================
 def generate_orange_report(df):
@@ -454,4 +454,5 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
