@@ -239,7 +239,7 @@ if st.session_state.logged_in and uploaded_file is not None and selected_company
         )
 
 
-# ================== تقرير فودافون ==================
+# ================== دالة فودافون ==================
 def generate_vodafone_report(df, original_df):
     df = df.copy()
     df['B_NUMBER'] = df['B_NUMBER'].astype(str)
@@ -324,12 +324,12 @@ def generate_vodafone_report(df, original_df):
     output.seek(0)
     return format_excel_sheets(output, header_color="FF0000")
 
-# ================== زر التحليل ==================
+# ================== زر التحليل بعد اتصالات ==================
 if st.session_state.logged_in and uploaded_file is not None and selected_company == "vodafone":
-    if st.button("تحليل الملف"):
+    if st.button("تحليل ملف فودافون"):
         result = generate_vodafone_report(current_df, original_df)
         st.download_button(
-            "تحميل التقرير",
+            "تحميل تقرير فودافون",
             data=result,
             file_name="vodafone_report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -429,6 +429,7 @@ def generate_orange_report():
     format_sheet(wb["site"], header_color="FF6600", hyperlink_col=3)
     wb.save(output_file)
     messagebox.showinfo("نجاح", f"تم إنشاء تقرير أورانج\nالملف:\n{output_file}")
+
 
 
 
