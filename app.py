@@ -211,6 +211,10 @@ def generate_etisalat_report(df, original_df):
     return format_excel_sheets(output)
 
 # ================== تقرير فودافون ==================
+import pandas as pd
+from io import BytesIO
+import streamlit as st
+
 def generate_vodafone_report(df):
     required_cols = [
         'B_NUMBER','B_NUMBER_FIRST_NAME','B_NUMBER_LAST_NAME','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS',
@@ -225,6 +229,8 @@ def generate_vodafone_report(df):
     df2 = df.copy()
     df2['B Full Name'] = df2['B_NUMBER_FIRST_NAME'].fillna('') + ' ' + df2['B_NUMBER_LAST_NAME'].fillna('')
     df2['IMEI'] = df2['IMEI'].astype(str)
+    df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
+    
     numbers = df2['B_NUMBER'].astype(str)
     freq = numbers.value_counts().reset_index()
     freq.columns = ['B Number','Count']
@@ -232,24 +238,31 @@ def generate_vodafone_report(df):
     # ===== حساب SMS =====
     sms_count = df2[df2['SERVICE'].astype(str).str.strip().isin(["Short message MO/PP","Short message MT/PP"])].groupby('B_NUMBER').size().reset_index(name='SMS')
 
+    # ===== أول وآخر مكالمة لكل رقم =====
+    call_dates = df2.groupby('B_NUMBER').agg(
+        First_Call=('FULL_DATE','min'),
+        Last_Call=('FULL_DATE','max')
+    ).reset_index()
+
     # ===== دمج البيانات =====
     df_final = freq.merge(
         df2[['B_NUMBER','B Full Name','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','B_NUMBER_NATIONAL_ID']].drop_duplicates(subset='B_NUMBER'),
         left_on='B Number', right_on='B_NUMBER', how='left'
     )
     df_final = df_final.merge(sms_count, left_on='B Number', right_on='B_NUMBER', how='left')
-    df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
+    df_final = df_final.merge(call_dates, left_on='B Number', right_on='B_NUMBER', how='left')
 
-    # ===== إضافة B Number id بعد B Full Name =====
+    df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
     df_final['B Number id'] = df_final['B_NUMBER_NATIONAL_ID'].astype(str)
 
     # ===== ترتيب الأعمدة النهائي =====
-    df_final = df_final[['B Number','Count','B Full Name','B Number id','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS']]
+    df_final = df_final[['B Number','Count','B Full Name','B Number id',
+                         'B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS',
+                         'First_Call','Last_Call']]
     df_final['Count'] = df_final['Count'].astype(int)
     df_final = df_final.sort_values(by='Count', ascending=False)
 
     # ===== تجميع بيانات IMEI =====
-    df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
     imei_group = df2.groupby('IMEI').agg(
         Count=('IMEI','count'),
         Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}'),
@@ -303,25 +316,3 @@ def generate_vodafone_report(df):
 
     return final_output
 
-# ================== أزرار التحليل ==================
-if st.session_state.logged_in and uploaded_file is not None:
-    if selected_company == "etisalat":
-        if st.button("تحليل الملف - اتصالات"):
-            result = generate_etisalat_report(current_df, original_df)
-            if result:
-                st.download_button(
-                    "تحميل تقرير اتصالات",
-                    data=result,
-                    file_name="etisalat_report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-    elif selected_company == "vodafone":
-        if st.button("تحليل الملف - فودافون"):
-            result = generate_vodafone_report(current_df)
-            if result:
-                st.download_button(
-                    "تحميل تقرير فودافون",
-                    data=result,
-                    file_name="vodafone_report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
