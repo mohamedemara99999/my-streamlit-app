@@ -227,16 +227,47 @@ def generate_etisalat_report(df, original_df):
     output.seek(0)
     return format_excel_sheets(output)
 
-# ================== زر التحليل ==================
-if st.session_state.logged_in and uploaded_file is not None and selected_company == "etisalat":
-    if st.button("تحليل الملف"):
-        result = generate_etisalat_report(current_df, original_df)
-        st.download_button(
-            "تحميل التقرير",
-            data=result,
-            file_name="etisalat_report.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+# ================== أزرار التحليل لكل الشركات ==================
+
+if st.session_state.logged_in and uploaded_file is not None:
+
+    # ===== اتصالات =====
+    if selected_company == "etisalat":
+        if st.button("تحليل الملف - اتصالات"):
+            result = generate_etisalat_report(current_df, original_df)
+            if result:
+                st.download_button(
+                    "تحميل تقرير اتصالات",
+                    data=result,
+                    file_name="etisalat_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+    # ===== فودافون =====
+    elif selected_company == "vodafone":
+        if st.button("تحليل الملف - فودافون"):
+            result = generate_vodafone_report()
+            if result:
+                st.download_button(
+                    "تحميل تقرير فودافون",
+                    data=open(os.path.join(os.path.dirname(current_file), "vodafone_report.xlsx"), "rb").read(),
+                    file_name="vodafone_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+    # ===== اورانج =====
+    elif selected_company == "orange":
+        if st.button("تحليل الملف - اورانج"):
+            # نفترض إن عندك دالة generate_orange_report
+            result = generate_orange_report(current_df)
+            if result:
+                st.download_button(
+                    "تحميل تقرير اورانج",
+                    data=result,
+                    file_name="orange_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
 
 
 def generate_vodafone_report():
@@ -428,3 +459,4 @@ def generate_orange_report():
     format_sheet(wb["site"], header_color="FF6600", hyperlink_col=3)
     wb.save(output_file)
     messagebox.showinfo("نجاح", f"تم إنشاء تقرير أورانج\nالملف:\n{output_file}")
+
