@@ -66,22 +66,18 @@ if st.session_state.logged_in:
             current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
             current_df = current_df.dropna(how='all', axis=1)
 
-            # ===== تحقق من الأعمدة =====
-            if selected_company == "etisalat" and 'Originating_Number' not in current_df.columns:
-                st.error("ملف غير صالح لاتصالات")
-            else:
-                st.success("تم فتح الملف بنجاح")
-                st.dataframe(current_df)
+            st.success("تم فتح الملف بنجاح")
+            st.dataframe(current_df)
 
         except Exception as e:
             st.error(f"خطأ في قراءة الملف: {e}")
 
 # ================== دالة تنسيق Excel ==================
-def format_excel_sheets(output):
+def format_excel_sheets(output, header_color="228B22"):
     output.seek(0)
     wb = load_workbook(output)
 
-    header_fill = PatternFill("solid", fgColor="228B22")
+    header_fill = PatternFill("solid", fgColor=header_color)
     header_font = Font(bold=True, color="FFFFFF")
 
     for ws in wb.worksheets:
@@ -169,19 +165,6 @@ def generate_etisalat_report(df, original_df):
     ).reset_index()
     df_final = df_final.merge(first_last, on='B Number', how='left')
 
-    # ===== استثناء أول رقم =====
-    if not df_final.empty:
-        top_number = df_final.iloc[0]['B Number']
-        mask = df_final['B Number'] == top_number
-        df_final.loc[mask, [
-            'B Full Name','B Address','B_NUMBER_SITE_ADDRESS','Latitude','Longitude','Map','SMS'
-        ]] = [
-            f"{df.iloc[0].get('A_Number_Details_First_Name','')} {df.iloc[0].get('A_Number_Details_Last_Name','')}",
-            '28607102800033',
-            df.iloc[0].get('MU_Site_Address',''),
-            '', '', '', 0
-        ]
-
     # ===== IMEI =====
     def safe_imei(x):
         try:
@@ -219,27 +202,15 @@ def generate_etisalat_report(df, original_df):
     # ===== إخراج Excel =====
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_final.to_excel(writer, sheet_name='calls', index=False)      # 👈 calls كامل
+        df_final.to_excel(writer, sheet_name='calls', index=False)
         imei_summary.to_excel(writer, sheet_name='imei', index=False)
         site_group.to_excel(writer, sheet_name='site', index=False)
-        original_df.to_excel(writer, sheet_name='cheet', index=False)    # 👈 الشيت الأصلي
+        original_df.to_excel(writer, sheet_name='cheet', index=False)    # الشيت الأصلي
 
     output.seek(0)
     return format_excel_sheets(output)
 
-# ================== زر التحليل ==================
-if st.session_state.logged_in and uploaded_file is not None and selected_company == "etisalat":
-    if st.button("تحليل الملف"):
-        result = generate_etisalat_report(current_df, original_df)
-        st.download_button(
-            "تحميل التقرير",
-            data=result,
-            file_name="etisalat_report.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-
-# ================== دالة فودافون ==================
+# ================== تقرير فودافون ==================
 def generate_vodafone_report(df):
     required_cols = [
         'B_NUMBER','B_NUMBER_FIRST_NAME','B_NUMBER_LAST_NAME','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS',
@@ -323,20 +294,37 @@ def generate_vodafone_report(df):
         site_group.to_excel(writer, sheet_name="site", index=False)
     output.seek(0)
 
-    # ===== تحقق من النوع قبل التنسيف =====
-    if output is None:
-        st.error("حدث خطأ: الملف غير موجود")
-        return None
-
     # ===== تطبيق التنسيقات =====
     try:
         final_output = format_excel_sheets(output, header_color="FF0000")
     except Exception as e:
         st.error(f"خطأ في تطبيق التنسيقات: {e}")
-        return output  # نرجع الملف الخام بدل ما يقف
+        return output
 
     return final_output
 
+# ================== أزرار التحليل ==================
+if st.session_state.logged_in and uploaded_file is not None:
+    if selected_company == "etisalat":
+        if st.button("تحليل الملف - اتصالات"):
+            result = generate_etisalat_report(current_df, original_df)
+            if result:
+                st.download_button(
+                    "تحميل تقرير اتصالات",
+                    data=result,
+                    file_name="etisalat_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+    elif selected_company == "vodafone":
+        if st.button("تحليل الملف - فودافون"):
+            result = generate_vodafone_report(current_df)
+            if result:
+                st.download_button(
+                    "تحميل تقرير فودافون",
+                    data=result,
+                    file_name="vodafone_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
 
 # ================== أورانج ==================
 def generate_orange_report():
@@ -431,6 +419,7 @@ def generate_orange_report():
     format_sheet(wb["site"], header_color="FF6600", hyperlink_col=3)
     wb.save(output_file)
     messagebox.showinfo("نجاح", f"تم إنشاء تقرير أورانج\nالملف:\n{output_file}")
+
 
 
 
