@@ -252,28 +252,27 @@ def generate_vodafone_report(df):
     sms_count = df2[df2['SERVICE'].astype(str).str.strip().isin(["Short message MO/PP","Short message MT/PP"])].groupby('B_NUMBER').size().reset_index(name='SMS')
 
     # ===== دمج البيانات =====
-    # ===== دمج البيانات =====
-df_final = freq.merge(
+    df_final = freq.merge(
     df2[['B_NUMBER','B Full Name','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','B_NUMBER_NATIONAL_ID']].drop_duplicates(subset='B_NUMBER'),
     left_on='B Number', right_on='B_NUMBER', how='left'
-)
-df_final = df_final.merge(sms_count, left_on='B Number', right_on='B_NUMBER', how='left')
-df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
+    )
+    df_final = df_final.merge(sms_count, left_on='B Number', right_on='B_NUMBER', how='left')
+    df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
 
-# ===== حساب أول وآخر مكالمة لكل B Number =====
-df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
-call_dates = df2.groupby('B_NUMBER')['FULL_DATE'].agg(First_Call='min', Last_Call='max').reset_index()
-df_final = df_final.merge(call_dates, left_on='B Number', right_on='B_NUMBER', how='left')
+    # ===== حساب أول وآخر مكالمة لكل B Number =====
+    df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
+    call_dates = df2.groupby('B_NUMBER')['FULL_DATE'].agg(First_Call='min', Last_Call='max').reset_index()
+    df_final = df_final.merge(call_dates, left_on='B Number', right_on='B_NUMBER', how='left')
 
-# ===== إضافة B Number id بعد B Full Name =====
-df_final['B Number id'] = df_final['B_NUMBER_NATIONAL_ID'].astype(str)
+    # ===== إضافة B Number id بعد B Full Name =====
+    df_final['B Number id'] = df_final['B_NUMBER_NATIONAL_ID'].astype(str)
 
-# ===== ترتيب الأعمدة النهائي مع الأعمدة الجديدة =====
-df_final = df_final[['B Number','Count','B Full Name','B Number id',
+    # ===== ترتيب الأعمدة النهائي مع الأعمدة الجديدة =====
+    df_final = df_final[['B Number','Count','B Full Name','B Number id',
                      'B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS',
                      'First_Call','Last_Call']]
-df_final['Count'] = df_final['Count'].astype(int)
-df_final = df_final.sort_values(by='Count', ascending=False)
+    df_final['Count'] = df_final['Count'].astype(int)
+    df_final = df_final.sort_values(by='Count', ascending=False)
 
 
     # ===== تجميع بيانات IMEI =====
@@ -440,3 +439,4 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
