@@ -7,8 +7,8 @@ from io import BytesIO
 # ================== تسجيل الدخول ==================
 USERS = {
     "admin": "m7md3mara2025",
-    "user1": "mostafa talaat",
-    "user2": "mohamed elmasry",
+    "user1": "mostafatalaat",
+    "user2": "mohamedelmasry",
     "user3": "2468"
 }
 
@@ -441,4 +441,5 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
