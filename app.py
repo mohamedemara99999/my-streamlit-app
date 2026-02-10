@@ -239,7 +239,7 @@ def generate_etisalat_report(df, original_df):
 # ================== تقرير فودافون ==================
 def generate_vodafone_report(df):
     required_cols = [
-        'B_NUMBER','B_NUMBER_NATIONAL_ID','B_NUMBER_SITE_ADDRESS',
+        'B_NUMBER','B_NUMBER_SITE_ADDRESS',
         'IMEI','HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME',
         'FULL_DATE','SITE_ADDRESS','LATITUDE','LONGITUDE','SERVICE'
     ]
@@ -259,7 +259,7 @@ def generate_vodafone_report(df):
     freq = df2['B_NUMBER'].value_counts().reset_index()
     freq.columns = ['B Number','Count']
 
-    # ===== حساب SMS =====
+    # ===== SMS =====
     sms_count = (
         df2[df2['SERVICE'].astype(str).str.strip()
         .isin(["Short message MO/PP","Short message MT/PP"])]
@@ -268,7 +268,7 @@ def generate_vodafone_report(df):
         .reset_index(name='SMS')
     )
 
-    # ===== أول وآخر مكالمة =====
+    # ===== First / Last Call =====
     df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'], errors='coerce')
     call_dates = (
         df2.groupby('B_NUMBER')['FULL_DATE']
@@ -277,7 +277,7 @@ def generate_vodafone_report(df):
     )
 
     df_final = freq.merge(
-        df2[['B_NUMBER','B_NUMBER_NATIONAL_ID','B_NUMBER_SITE_ADDRESS']]
+        df2[['B_NUMBER','B_NUMBER_SITE_ADDRESS']]
         .drop_duplicates(subset='B_NUMBER'),
         left_on='B Number', right_on='B_NUMBER', how='left'
     )
@@ -292,15 +292,17 @@ def generate_vodafone_report(df):
 
     df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
     df_final['Count'] = df_final['Count'].astype(int)
-    df_final['B Number id'] = df_final['B_NUMBER_NATIONAL_ID'].astype(str)
+
+    # عمود الرقم القومي فاضي
+    df_final['B Number Id'] = ''
 
     df_final = df_final[
-        ['B Number','Count','B Number id',
+        ['B Number','Count','B Number Id',
          'B_NUMBER_SITE_ADDRESS','SMS','First_Call','Last_Call']
     ].sort_values(by='Count', ascending=False)
 
     # ===============================
-    # IMEI (كما هو)
+    # IMEI
     # ===============================
     imei_group = df2.groupby('IMEI').agg(
         Count=('IMEI','count'),
@@ -318,12 +320,11 @@ def generate_vodafone_report(df):
 
     imei_group['First_Use_Address'] = [x[0] for x in first_last_addr]
     imei_group['Last_Use_Address'] = [x[1] for x in first_last_addr]
-
     imei_group['Count'] = imei_group['Count'].astype(int)
     imei_group = imei_group.sort_values(by='Count', ascending=False)
 
     # ===============================
-    # Sites (كما هو)
+    # Sites
     # ===============================
     site_df = df2[['SITE_ADDRESS','LATITUDE','LONGITUDE','FULL_DATE']].copy()
     site_group = site_df.groupby('SITE_ADDRESS').agg(
@@ -339,7 +340,7 @@ def generate_vodafone_report(df):
     site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
 
     # ===============================
-    # حفظ Excel
+    # Excel
     # ===============================
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -349,8 +350,7 @@ def generate_vodafone_report(df):
         df.to_excel(writer, sheet_name="cheet", index=False)
 
     output.seek(0)
-    final_output = format_excel_sheets(output, header_color="FF0000", company="vodafone")
-    return final_output
+    return format_excel_sheets(output, header_color="FF0000", company="vodafone")
 
 # ================== تقرير أورانج ==================
 def generate_orange_report(df):
@@ -467,6 +467,7 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
 
 
 
