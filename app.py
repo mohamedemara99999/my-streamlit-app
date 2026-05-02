@@ -623,10 +623,10 @@ if current_df is not None:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        if st.button("تقرير اتصالات معمل"):
-            output = generate_etisalat_report(current_df, original_df, "etisalat")
-            if output:
-                st.download_button("تحميل اتصالات", output, "etisalat.xlsx")
+    if st.button("تقرير اتصالات معمل"):
+        output = generate_etisalat_report(current_df, original_df)
+        if output:
+            st.download_button("تحميل اتصالات", output, "etisalat.xlsx")
 
     with col2:
         if st.button("تقرير اتصالات شركة"):
