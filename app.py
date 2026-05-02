@@ -642,7 +642,7 @@ if current_df is not None:
               if output:
                   st.download_button("تحميل فودافون", output, "vodafone.xlsx")
 
-   with col4:
+    with col4:
         if st.button("تقرير أورانج"):
               output = generate_orange_report(current_df)
               if output:
