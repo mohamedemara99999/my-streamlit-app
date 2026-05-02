@@ -1,3 +1,260 @@
+import streamlit as st
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Font, Alignment
+from io import BytesIO
+
+# ================== تسجيل الدخول ==================
+USERS = {
+    "admin": "m7md3mara2025",
+    "user1": "mostafatalaat",
+    "user2": "mohamedelmasry",
+    "user3": "2468"
+}
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "current_user" not in st.session_state:
+    st.session_state.current_user = None
+
+if not st.session_state.logged_in:
+    st.title("🔐 تسجيل الدخول")
+
+    username = st.text_input("اسم المستخدم")
+    password = st.text_input("كلمة المرور", type="password")
+
+    if st.button("دخول"):
+        if username in USERS and USERS[username] == password:
+            st.session_state.logged_in = True
+            st.session_state.current_user = username
+            st.experimental_rerun()
+        else:
+            st.error("❌ بيانات غير صحيحة")
+
+# ================== بعد تسجيل الدخول ==================
+if st.session_state.logged_in:
+
+    st.sidebar.success(f"مرحباً {st.session_state.current_user}")
+
+    if st.sidebar.button("تسجيل خروج"):
+        st.session_state.logged_in = False
+        st.session_state.current_user = None
+        st.experimental_rerun()
+
+    st.title("Excel Analyzer Tool - Streamlit")
+
+    selected_company = st.selectbox(
+        "اختر الشركة",
+        ["etisalat", "vodafone", "orange"]
+    )
+
+    uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
+
+    current_df = None
+    original_df = None
+
+    # نسخة الشيت الأصلي
+    if uploaded_file is not None:
+        try:
+            if selected_company == "orange":
+                current_df = pd.read_excel(uploaded_file, header=4, engine="openpyxl")
+            else:
+                current_df = pd.read_excel(uploaded_file, engine="openpyxl")
+
+            # ===== حفظ نسخة أصلية قبل أي تعديل =====
+            original_df = current_df.copy()
+
+            # ===== تنظيف الأعمدة =====
+            current_df.columns = current_df.columns.str.strip()
+            current_df = current_df.loc[:, ~current_df.columns.str.contains('^Unnamed')]
+            current_df = current_df.dropna(how='all', axis=1)
+
+            # ===== تحقق من الأعمدة =====
+            if selected_company == "etisalat" and 'Originating_Number' not in current_df.columns:
+                st.error("ملف غير صالح لاتصالات")
+            else:
+                st.success("تم فتح الملف بنجاح")
+                st.dataframe(current_df)
+
+        except Exception as e:
+            st.error(f"خطأ في قراءة الملف: {e}")
+
+# ================== دالة تنسيق Excel ==================
+def format_excel_sheets(output, header_color="006400", company="etisalat"):
+    output.seek(0)
+    wb = load_workbook(output)
+
+    header_fill = PatternFill("solid", fgColor=header_color)
+    header_font = Font(bold=True, color="FFFFFF")
+
+    first_row_fill_calls = PatternFill("solid", fgColor="FFFF00")
+    first_row_font_calls = Font(bold=True, color="000000")
+
+    for ws in wb.worksheets:
+
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+
+        if company.lower() == "etisalat" and ws.title.lower() == "calls" and ws.max_row > 1:
+            for cell in ws[2]:
+                cell.fill = first_row_fill_calls
+                cell.font = first_row_font_calls
+
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+            for cell in row:
+                if isinstance(cell.value, str) and cell.value.startswith("http"):
+                    cell.hyperlink = cell.value
+                    if "google.com/maps" in cell.value:
+                        cell.value = "Map"
+                    elif "imei.info" in cell.value:
+                        cell.value = "IMEI Info"
+                    cell.font = Font(color="006400", underline="single")
+
+    final = BytesIO()
+    wb.save(final)
+    final.seek(0)
+    return final
+
+# ================== تقرير اتصالات ==================
+def generate_etisalat_report(df, original_df):
+    df = df.copy()
+
+    df['Originating_Number'] = df['Originating_Number'].astype(str)
+    df['Terminating_Number'] = df['Terminating_Number'].astype(str)
+
+    numbers = pd.concat([df['Originating_Number'], df['Terminating_Number']])
+    freq = numbers.value_counts().reset_index()
+    freq.columns = ['B Number', 'Count']
+
+    b_data = {}
+
+    for _, row in df.iterrows():
+        for col in ['Originating_Number', 'Terminating_Number']:
+            num = str(row[col])
+            if num not in b_data:
+                b_data[num] = {
+                    'B Full Name': row.get('B_Number_Full_Name', ''),
+                    'B Address': row.get('B_Number_Address', ''),
+                    'B_NUMBER_SITE_ADDRESS': row.get('B_Number_MU_Site_Address', ''),
+                    'Latitude': row.get('B_Number_MU_Latitude', ''),
+                    'Longitude': row.get('B_Number_MU_Longitude', '')
+                }
+
+    df_final = freq.copy()
+
+    for col in ['B Full Name','B Address','B_NUMBER_SITE_ADDRESS','Latitude','Longitude']:
+        df_final[col] = df_final['B Number'].map(lambda x: b_data[x][col] if x in b_data else '')
+
+    df_final['Map'] = df_final.apply(
+        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}'
+        if pd.notna(r['Latitude']) and r['Latitude'] != '' else '',
+        axis=1
+    )
+
+    temp_df = df.copy()
+    temp_df['activity_clean'] = temp_df['Network_Activity_Type_Name'].astype(str).str.strip()
+
+    sms_stats = temp_df.groupby('Originating_Number').agg(
+        SMS=('activity_clean', lambda x: (x == 'SMS').sum())
+    ).reset_index()
+
+    df_final = df_final.merge(
+        sms_stats,
+        left_on='B Number',
+        right_on='Originating_Number',
+        how='left'
+    ).drop(columns='Originating_Number')
+
+    df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
+    df_final['Count'] = df_final['Count'].astype(int)
+
+    temp_df['Call_Start_Date'] = pd.to_datetime(temp_df['Call_Start_Date'], errors='coerce')
+
+    calls = pd.concat([
+        temp_df[['Originating_Number','Call_Start_Date']].rename(columns={'Originating_Number':'B Number'}),
+        temp_df[['Terminating_Number','Call_Start_Date']].rename(columns={'Terminating_Number':'B Number'})
+    ])
+
+    first_last = calls.groupby('B Number').agg(
+        First_Call=('Call_Start_Date','min'),
+        Last_Call=('Call_Start_Date','max')
+    ).reset_index()
+
+    df_final = df_final.merge(first_last, on='B Number', how='left')
+
+    if not df_final.empty:
+        top_number = df_final.iloc[0]['B Number']
+        mask = df_final['B Number'] == top_number
+
+        df_final.loc[mask, [
+            'B Full Name','B Address','B_NUMBER_SITE_ADDRESS',
+            'Latitude','Longitude','Map','SMS'
+        ]] = [
+            f"{df.iloc[0].get('A_Number_Details_First_Name','')} {df.iloc[0].get('A_Number_Details_Last_Name','')}",
+            '28607102800033',
+            df.iloc[0].get('MU_Site_Address',''),
+            '',
+            '',
+            '',
+            0
+        ]
+
+    def safe_imei(x):
+        try:
+            return str(int(float(x)))
+        except:
+            return ''
+
+    imei_df = df.copy()
+    imei_df['IMEI_Number'] = imei_df['IMEI_Number'].apply(safe_imei)
+
+    imei_summary = imei_df.groupby('IMEI_Number').agg(
+        Count=('IMEI_Number','count'),
+        First_Use_Date=('Call_Start_Date','min'),
+        Last_Use_Date=('Call_Start_Date','max'),
+        First_Use_Address=('Site_Address','first'),
+        Last_Use_Address=('Site_Address','last')
+    ).reset_index()
+
+    imei_summary.rename(columns={'IMEI_Number':'IMEI'}, inplace=True)
+
+    imei_summary['Device Info'] = imei_summary['IMEI'].apply(
+        lambda x: f'https://www.imei.info/calc/?imei={x}'
+    )
+
+    imei_summary = imei_summary.sort_values(by='Count', ascending=False)
+
+    site_df = df[['Site_Address','Latitude','Longitude','Call_Start_Date']].copy()
+
+    site_group = site_df.groupby('Site_Address').agg(
+        Count=('Site_Address','count'),
+        First_Use_Date=('Call_Start_Date','min'),
+        Last_Use_Date=('Call_Start_Date','max'),
+        Latitude=('Latitude','first'),
+        Longitude=('Longitude','first')
+    ).reset_index()
+
+    site_group['Map'] = site_group.apply(
+        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}',
+        axis=1
+    )
+
+    site_group = site_group[['Site_Address','Count','Map','First_Use_Date','Last_Use_Date']].sort_values(by='Count', ascending=False)
+
+    output = BytesIO()
+
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_final.to_excel(writer, sheet_name='calls', index=False)
+        imei_summary.to_excel(writer, sheet_name='imei', index=False)
+        site_group.to_excel(writer, sheet_name='site', index=False)
+        original_df.to_excel(writer, sheet_name='cheet', index=False)
+
+    output.seek(0)
+    return format_excel_sheets(output, header_color="006400", company="etisalat")
+
 # ================== تقرير فودافون ==================
 def generate_vodafone_report(df):
     required_cols = [
