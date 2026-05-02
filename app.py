@@ -185,22 +185,18 @@ def generate_etisalat_report(df, original_df):
 
     df_final = df_final.merge(first_last, on='B Number', how='left')
 
+    # ===== استثناء أول رقم (FIXED VERSION) =====
     if not df_final.empty:
         top_number = df_final.iloc[0]['B Number']
         mask = df_final['B Number'] == top_number
 
-        df_final.loc[mask, [
-            'B Full Name','B Address','B_NUMBER_SITE_ADDRESS',
-            'Latitude','Longitude','Map','SMS'
-        ]] = [
-            f"{df.iloc[0].get('A_Number_Details_First_Name','')} {df.iloc[0].get('A_Number_Details_Last_Name','')}",
-            '28607102800033',
-            df.iloc[0].get('MU_Site_Address',''),
-            '',
-            '',
-            '',
-            0
-        ]
+        df_final.loc[mask, 'B Full Name'] = f"{df.iloc[0].get('A_Number_Details_First_Name','')} {df.iloc[0].get('A_Number_Details_Last_Name','')}"
+        df_final.loc[mask, 'B Address'] = '28607102800033'
+        df_final.loc[mask, 'B_NUMBER_SITE_ADDRESS'] = df.iloc[0].get('MU_Site_Address','')
+        df_final.loc[mask, 'Latitude'] = ''
+        df_final.loc[mask, 'Longitude'] = ''
+        df_final.loc[mask, 'Map'] = ''
+        df_final.loc[mask, 'SMS'] = 0
 
     def safe_imei(x):
         try:
