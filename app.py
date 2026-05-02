@@ -619,28 +619,46 @@ def generate_etisalat_company_report(df):
         header_color="006400",
         company="etisalat_company"
     )
-# ================== أزرار التقارير ==================
-if current_df is not None:
-    st.subheader("توليد تقارير")
+with col1:
+    if st.button("تقرير اتصالات معمل"):
+        output = generate_etisalat_report(current_df, original_df, "etisalat")
+        if output:
+            st.download_button(
+                label="تحميل اتصالات",
+                data=output,
+                file_name="etisalat.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
-    col1, col2, col3, col4 = st.columns(4)
+with col2:
+    if st.button("تقرير اتصالات شركة"):
+        output = generate_etisalat_company_report(current_df)
+        if output:
+            st.download_button(
+                label="تحميل اتصالات شركة",
+                data=output,
+                file_name="etisalat_company.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
-    with col1:
-        if st.button("تقرير اتصالات معمل"):
-            output = generate_etisalat_report(current_df, original_df, "etisalat")
-            if output:
-                st.download_button("تحميل اتصالات", output, "etisalat.xlsx")
+with col3:
+    if st.button("تقرير فودافون"):
+        output = generate_vodafone_report(current_df)
+        if output:
+            st.download_button(
+                label="تحميل فودافون",
+                data=output,
+                file_name="vodafone.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
-    with col2:
-        if st.button("تقرير اتصالات شركة"):
-            output = generate_etisalat_company_report(current_df)
-            if output:
-                st.download_button("تحميل اتصالات شركة", output, "etisalat_company.xlsx")
-
-    with col3:
-        if st.button("تقرير فودافون"):
-            st.info("نفس الدالة الحالية")
-
-    with col4:
-        if st.button("تقرير أورانج"):
-            st.info("نفس الدالة الحالية")
+with col4:
+    if st.button("تقرير أورانج"):
+        output = generate_orange_report(current_df)
+        if output:
+            st.download_button(
+                label="تحميل أورانج",
+                data=output,
+                file_name="orange.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
