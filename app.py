@@ -515,13 +515,12 @@ def generate_orange_report(df):
     output.seek(0)
     return format_excel_sheets(output, header_color="FF6600", company="orange")
 
-def generate_etisalat_new_report(df):
+def generate_etisalat_company_report(df):
     df = df.copy()
 
     # ================= تنظيف =================
     df['Subscriber_Number'] = df['Subscriber_Number'].astype(str)
     df['b_number_full'] = df['b_number_full'].astype(str)
-
     df['Call_Start_Date'] = pd.to_datetime(df['Call_Start_Date'], errors='coerce')
 
     # ================= Frequency =================
@@ -539,21 +538,22 @@ def generate_etisalat_new_report(df):
         'B_Num_Most_Location_Address'
     ]].drop_duplicates(subset='b_number_full')
 
-    base_info.rename(columns={'b_number_full': 'B Number'}, inplace=True)
+    base_info = base_info.rename(columns={'b_number_full': 'B Number'})
 
-    # ================= Calls =================
+    # ================= Main Table =================
     df_final = freq.merge(base_info, on='B Number', how='left')
 
+    # ================= SMS Stats =================
     sms_stats = df.groupby('b_number_full').agg(
-        SMS=('Service', lambda x: (x.astype(str).str.contains("SMS")).sum())
+        SMS=('Service', lambda x: x.astype(str).str.contains("SMS", na=False).sum())
     ).reset_index()
 
-    sms_stats.rename(columns={'b_number_full': 'B Number'}, inplace=True)
+    sms_stats = sms_stats.rename(columns={'b_number_full': 'B Number'})
 
     df_final = df_final.merge(sms_stats, on='B Number', how='left')
     df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
 
-    # ================= Calls Time =================
+    # ================= Call Time =================
     calls = pd.concat([
         df[['Subscriber_Number', 'Call_Start_Date']].rename(columns={'Subscriber_Number': 'B Number'}),
         df[['b_number_full', 'Call_Start_Date']].rename(columns={'b_number_full': 'B Number'})
@@ -566,25 +566,27 @@ def generate_etisalat_new_report(df):
 
     df_final = df_final.merge(time_stats, on='B Number', how='left')
 
-    # ================= IMEI =================
+    # ================= IMEI Analysis =================
     imei_df = df.copy()
     imei_df['Subscriber_IMEI'] = imei_df['Subscriber_IMEI'].astype(str)
 
     imei_group = imei_df.groupby('Subscriber_IMEI').agg(
         Count=('Subscriber_IMEI', 'count'),
-        First_Use=('Call_Start_Date', 'min'),
-        Last_Use=('Call_Start_Date', 'max'),
+        First_Use_Date=('Call_Start_Date', 'min'),
+        Last_Use_Date=('Call_Start_Date', 'max'),
         First_Location=('Subscriber_Location_Address', 'first'),
         Last_Location=('Subscriber_Location_Address', 'last')
     ).reset_index()
 
-    imei_group.rename(columns={'Subscriber_IMEI': 'IMEI'}, inplace=True)
+    imei_group = imei_group.rename(columns={'Subscriber_IMEI': 'IMEI'})
 
     imei_group['Device Info'] = imei_group['IMEI'].apply(
         lambda x: f'https://www.imei.info/calc/?imei={x}'
     )
 
-    # ================= SITE =================
+    imei_group = imei_group.sort_values(by='Count', ascending=False)
+
+    # ================= SITE Analysis =================
     site_group = df.groupby('Subscriber_Location_Address').agg(
         Count=('Subscriber_Location_Address', 'count'),
         First_Use=('Call_Start_Date', 'min'),
@@ -594,10 +596,12 @@ def generate_etisalat_new_report(df):
     ).reset_index()
 
     site_group['Map'] = site_group.apply(
-        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["LAT"]},{r["LON"]}'
-        if pd.notna(r["LAT"]) else '',
+        lambda r: f"https://www.google.com/maps/search/?api=1&query={r['LAT']},{r['LON']}"
+        if pd.notna(r['LAT']) and pd.notna(r['LON']) else '',
         axis=1
     )
+
+    site_group = site_group.sort_values(by='Count', ascending=False)
 
     # ================= OUTPUT =================
     output = BytesIO()
@@ -609,7 +613,12 @@ def generate_etisalat_new_report(df):
         df.to_excel(writer, sheet_name='cheet', index=False)
 
     output.seek(0)
-    return format_excel_sheets(output, header_color="006400", company="etisalat")
+
+    return format_excel_sheets(
+        output,
+        header_color="006400",
+        company="etisalat_company"
+    )
 # ================== أزرار التقارير ==================
 if current_df is not None:
     st.subheader("توليد تقارير")
@@ -624,7 +633,7 @@ if current_df is not None:
 
     with col2:
         if st.button("تقرير اتصالات شركة"):
-            output = generate_etisalat_report(current_df, original_df, "etisalat_company")
+            output = generate_etisalat_company_report(current_df)
             if output:
                 st.download_button("تحميل اتصالات شركة", output, "etisalat_company.xlsx")
 
