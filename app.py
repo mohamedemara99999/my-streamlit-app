@@ -43,7 +43,7 @@ if st.session_state.logged_in:
 
     selected_company = st.selectbox(
         "اختر الشركة",
-        ["etisalat", "vodafone", "orange"]
+        ["etisalat", "etisalat_company", "vodafone", "orange"]
     )
 
     uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
