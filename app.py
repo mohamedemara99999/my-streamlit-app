@@ -7,8 +7,6 @@ from io import BytesIO
 # ================== تسجيل الدخول ==================
 USERS = {
     "admin": "m7md3mara2025",
-    "user1": "mostafatalaat",
-    "user2": "mohamedelmasry",
     "user3": "2468"
 }
 
@@ -121,16 +119,16 @@ def format_excel_sheets(output, header_color="006400", company="etisalat"):
 # ================== تقرير اتصالات ==================
 def generate_etisalat_report(df, original_df):
     df = df.copy()
-
     df['Originating_Number'] = df['Originating_Number'].astype(str)
     df['Terminating_Number'] = df['Terminating_Number'].astype(str)
 
+    # ===== حساب التكرار =====
     numbers = pd.concat([df['Originating_Number'], df['Terminating_Number']])
     freq = numbers.value_counts().reset_index()
     freq.columns = ['B Number', 'Count']
 
+    # ===== إنشاء dictionary للـ B Data =====
     b_data = {}
-
     for _, row in df.iterrows():
         for col in ['Originating_Number', 'Terminating_Number']:
             num = str(row[col])
@@ -144,60 +142,56 @@ def generate_etisalat_report(df, original_df):
                 }
 
     df_final = freq.copy()
-
     for col in ['B Full Name','B Address','B_NUMBER_SITE_ADDRESS','Latitude','Longitude']:
         df_final[col] = df_final['B Number'].map(lambda x: b_data[x][col] if x in b_data else '')
 
+    # ===== Map =====
     df_final['Map'] = df_final.apply(
         lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}'
         if pd.notna(r['Latitude']) and r['Latitude'] != '' else '',
         axis=1
     )
 
+    # ===== حساب SMS من Originating فقط =====
     temp_df = df.copy()
     temp_df['activity_clean'] = temp_df['Network_Activity_Type_Name'].astype(str).str.strip()
-
     sms_stats = temp_df.groupby('Originating_Number').agg(
         SMS=('activity_clean', lambda x: (x == 'SMS').sum())
     ).reset_index()
 
     df_final = df_final.merge(
-        sms_stats,
-        left_on='B Number',
-        right_on='Originating_Number',
-        how='left'
+        sms_stats, left_on='B Number', right_on='Originating_Number', how='left'
     ).drop(columns='Originating_Number')
 
     df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
     df_final['Count'] = df_final['Count'].astype(int)
 
+    # ===== First / Last Call =====
     temp_df['Call_Start_Date'] = pd.to_datetime(temp_df['Call_Start_Date'], errors='coerce')
-
     calls = pd.concat([
         temp_df[['Originating_Number','Call_Start_Date']].rename(columns={'Originating_Number':'B Number'}),
         temp_df[['Terminating_Number','Call_Start_Date']].rename(columns={'Terminating_Number':'B Number'})
     ])
-
     first_last = calls.groupby('B Number').agg(
         First_Call=('Call_Start_Date','min'),
         Last_Call=('Call_Start_Date','max')
     ).reset_index()
-
     df_final = df_final.merge(first_last, on='B Number', how='left')
 
-    # ===== استثناء أول رقم (FIXED VERSION) =====
+    # ===== استثناء أول رقم =====
     if not df_final.empty:
         top_number = df_final.iloc[0]['B Number']
         mask = df_final['B Number'] == top_number
+        df_final.loc[mask, [
+            'B Full Name','B Address','B_NUMBER_SITE_ADDRESS','Latitude','Longitude','Map','SMS'
+        ]] = [
+            f"{df.iloc[0].get('A_Number_Details_First_Name','')} {df.iloc[0].get('A_Number_Details_Last_Name','')}",
+            '28607102800033',
+            df.iloc[0].get('MU_Site_Address',''),
+            '', '', '', 0
+        ]
 
-        df_final.loc[mask, 'B Full Name'] = f"{df.iloc[0].get('A_Number_Details_First_Name','')} {df.iloc[0].get('A_Number_Details_Last_Name','')}"
-        df_final.loc[mask, 'B Address'] = '28607102800033'
-        df_final.loc[mask, 'B_NUMBER_SITE_ADDRESS'] = df.iloc[0].get('MU_Site_Address','')
-        df_final.loc[mask, 'Latitude'] = ''
-        df_final.loc[mask, 'Longitude'] = ''
-        df_final.loc[mask, 'Map'] = ''
-        df_final.loc[mask, 'SMS'] = 0
-
+    # ===== IMEI =====
     def safe_imei(x):
         try:
             return str(int(float(x)))
@@ -206,7 +200,6 @@ def generate_etisalat_report(df, original_df):
 
     imei_df = df.copy()
     imei_df['IMEI_Number'] = imei_df['IMEI_Number'].apply(safe_imei)
-
     imei_summary = imei_df.groupby('IMEI_Number').agg(
         Count=('IMEI_Number','count'),
         First_Use_Date=('Call_Start_Date','min'),
@@ -214,17 +207,12 @@ def generate_etisalat_report(df, original_df):
         First_Use_Address=('Site_Address','first'),
         Last_Use_Address=('Site_Address','last')
     ).reset_index()
-
     imei_summary.rename(columns={'IMEI_Number':'IMEI'}, inplace=True)
-
-    imei_summary['Device Info'] = imei_summary['IMEI'].apply(
-        lambda x: f'https://www.imei.info/calc/?imei={x}'
-    )
-
+    imei_summary['Device Info'] = imei_summary['IMEI'].apply(lambda x: f'https://www.imei.info/calc/?imei={x}')
     imei_summary = imei_summary.sort_values(by='Count', ascending=False)
 
+    # ===== Sites =====
     site_df = df[['Site_Address','Latitude','Longitude','Call_Start_Date']].copy()
-
     site_group = site_df.groupby('Site_Address').agg(
         Count=('Site_Address','count'),
         First_Use_Date=('Call_Start_Date','min'),
@@ -232,16 +220,13 @@ def generate_etisalat_report(df, original_df):
         Latitude=('Latitude','first'),
         Longitude=('Longitude','first')
     ).reset_index()
-
     site_group['Map'] = site_group.apply(
-        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}',
-        axis=1
+        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}', axis=1
     )
-
     site_group = site_group[['Site_Address','Count','Map','First_Use_Date','Last_Use_Date']].sort_values(by='Count', ascending=False)
 
+    # ===== إخراج Excel =====
     output = BytesIO()
-
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_final.to_excel(writer, sheet_name='calls', index=False)
         imei_summary.to_excel(writer, sheet_name='imei', index=False)
