@@ -673,7 +673,7 @@ if current_df is not None:
 
     with col1:
         if st.button("تقرير اتصالات"):
-            output = generate_etisalat_report(current_df, original_df)
+            output = generate_etisalat_report(current_df, current_df.copy())
             if output:
                 st.download_button(
                     label="تحميل تقرير اتصالات",
