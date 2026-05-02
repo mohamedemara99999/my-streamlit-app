@@ -7,18 +7,18 @@ from io import BytesIO
 # ================== تسجيل الدخول ==================
 USERS = {
     "admin": "m7md3mara2025",
+    "user1": "mostafatalaat",
+    "user2": "mohamedelmasry",
     "user3": "2468"
 }
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
 if not st.session_state.logged_in:
     st.title("🔐 تسجيل الدخول")
-
     username = st.text_input("اسم المستخدم")
     password = st.text_input("كلمة المرور", type="password")
 
@@ -34,7 +34,6 @@ if not st.session_state.logged_in:
 if st.session_state.logged_in:
 
     st.sidebar.success(f"مرحباً {st.session_state.current_user}")
-
     if st.sidebar.button("تسجيل خروج"):
         st.session_state.logged_in = False
         st.session_state.current_user = None
@@ -50,9 +49,8 @@ if st.session_state.logged_in:
     uploaded_file = st.file_uploader("اختر ملف Excel", type=["xlsx", "xls"])
 
     current_df = None
-    original_df = None
+    original_df = None   # نسخة الشيت الأصلي
 
-    # نسخة الشيت الأصلي
     if uploaded_file is not None:
         try:
             if selected_company == "orange":
@@ -79,28 +77,30 @@ if st.session_state.logged_in:
             st.error(f"خطأ في قراءة الملف: {e}")
 
 # ================== دالة تنسيق Excel ==================
-def format_excel_sheets(output, header_color="006400", company="etisalat"):
+def format_excel_sheets(output, header_color="006400", company="etisalat"):  # أضفنا company
     output.seek(0)
     wb = load_workbook(output)
 
     header_fill = PatternFill("solid", fgColor=header_color)
     header_font = Font(bold=True, color="FFFFFF")
 
-    first_row_fill_calls = PatternFill("solid", fgColor="FFFF00")
+    first_row_fill_calls = PatternFill("solid", fgColor="FFFF00")  # أصفر
     first_row_font_calls = Font(bold=True, color="000000")
 
     for ws in wb.worksheets:
-
+        # ===== الهيدر لكل الشيتات =====
         for cell in ws[1]:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center")
 
+        # ===== أول صف بعد الهيدر فقط لاتصالات =====
         if company.lower() == "etisalat" and ws.title.lower() == "calls" and ws.max_row > 1:
             for cell in ws[2]:
                 cell.fill = first_row_fill_calls
                 cell.font = first_row_font_calls
 
+        # ===== روابط هايبرلينك =====
         for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
             for cell in row:
                 if isinstance(cell.value, str) and cell.value.startswith("http"):
@@ -235,6 +235,7 @@ def generate_etisalat_report(df, original_df):
 
     output.seek(0)
     return format_excel_sheets(output, header_color="006400", company="etisalat")
+
 # ================== تقرير فودافون ==================
 def generate_vodafone_report(df):
     required_cols = [
@@ -254,12 +255,15 @@ def generate_vodafone_report(df):
     df2['IMEI'] = df2['IMEI'].astype(str)
     df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'], errors='coerce')
 
+    # ======================
+    # calls
+    # ======================
     freq = df2['B_NUMBER'].value_counts().reset_index()
     freq.columns = ['B Number','Count']
 
     sms_count = (
         df2[df2['SERVICE'].astype(str).str.strip()
-            .isin(["Short message MO/PP","Short message MT/PP"])]
+        .isin(["Short message MO/PP","Short message MT/PP"])]
         .groupby('B_NUMBER')
         .size()
         .reset_index(name='SMS')
@@ -277,24 +281,15 @@ def generate_vodafone_report(df):
     )
 
     df_final = freq.merge(
-        base_info,
-        left_on='B Number',
-        right_on='B_NUMBER',
-        how='left'
+        base_info, left_on='B Number', right_on='B_NUMBER', how='left'
     )
 
     df_final = df_final.merge(
-        sms_count,
-        left_on='B Number',
-        right_on='B_NUMBER',
-        how='left'
+        sms_count, left_on='B Number', right_on='B_NUMBER', how='left'
     )
 
     df_final = df_final.merge(
-        call_dates,
-        left_on='B Number',
-        right_on='B_NUMBER',
-        how='left'
+        call_dates, left_on='B Number', right_on='B_NUMBER', how='left'
     )
 
     df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
@@ -306,6 +301,9 @@ def generate_vodafone_report(df):
          'B_NUMBER_SITE_ADDRESS','SMS','First_Call','Last_Call']
     ].sort_values(by='Count', ascending=False)
 
+    # ======================
+    # IMEI
+    # ======================
     imei_group = df2.groupby('IMEI').agg(
         Count=('IMEI','count'),
         Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}'),
@@ -316,35 +314,35 @@ def generate_vodafone_report(df):
     ).reset_index()
 
     first_last_addr = []
-
     for imei in imei_group['IMEI']:
         sub = df2[df2['IMEI'] == imei].sort_values('FULL_DATE')
-        first_last_addr.append(
-            (sub.iloc[0]['SITE_ADDRESS'], sub.iloc[-1]['SITE_ADDRESS'])
-        )
+        first_last_addr.append((sub.iloc[0]['SITE_ADDRESS'], sub.iloc[-1]['SITE_ADDRESS']))
 
     imei_group['First_Use_Address'] = [x[0] for x in first_last_addr]
     imei_group['Last_Use_Address'] = [x[1] for x in first_last_addr]
-
     imei_group['Count'] = imei_group['Count'].astype(int)
     imei_group = imei_group.sort_values(by='Count', ascending=False)
 
+    # ======================
+    # site
+    # ======================
     site_df = df2[['SITE_ADDRESS','LATITUDE','LONGITUDE','FULL_DATE']].copy()
-
     site_group = site_df.groupby('SITE_ADDRESS').agg(
         Count=('SITE_ADDRESS','count'),
-        Map=('LATITUDE', lambda x: f'https://www.google.com/maps/search/?api=1&query={x.iloc[0]},{site_df.loc[x.index[0],"LONGITUDE"]}'),
+        Map=('LATITUDE', lambda x:
+             f'https://www.google.com/maps/search/?api=1&query={x.iloc[0]},{site_df.loc[x.index[0],"LONGITUDE"]}'),
         First_Use_Date=('FULL_DATE','min'),
         Last_Use_Date=('FULL_DATE','max')
     ).reset_index()
 
     site_group['Count'] = site_group['Count'].astype(int)
-
     site_group = site_group.sort_values(by='Count', ascending=False)
     site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
 
+    # ======================
+    # Excel
+    # ======================
     output = BytesIO()
-
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_final.to_excel(writer, sheet_name="calls", index=False)
         imei_group.to_excel(writer, sheet_name="imei", index=False)
@@ -354,7 +352,6 @@ def generate_vodafone_report(df):
     output.seek(0)
     return format_excel_sheets(output, header_color="FF0000", company="vodafone")
 
-
 # ================== تقرير أورانج ==================
 def generate_orange_report(df):
     df.columns = df.columns.str.strip().str.upper()
@@ -363,15 +360,18 @@ def generate_orange_report(df):
         'TARGET_MSISDN','TARGET_IMEI','TARGET_IMSI','TARGET_IMEI_TYPE',
         'EVENT_START_TIME','CALL_DURATION','EVENT_DIRECTION',
         'OTHER_MSISDN','OTHER_NAME','OTHER_ID','OTHER_ADDRESS',
-        'CELL_ADDRESS','CELL_LAT','CELL_LONG','OTHER_CELL_ADDRESS'
+        'CELL_ADDRESS','CELL_LAT','CELL_LONG',
+        'OTHER_CELL_ADDRESS'
     ]
 
     missing_cols = [col for col in required_cols if col not in df.columns]
-
     if missing_cols:
         st.error(f"الأعمدة التالية غير موجودة في الملف: {missing_cols}")
         return None
 
+    # ======================
+    # calls
+    # ======================
     numbers = df['OTHER_MSISDN'].astype(str)
     freq = numbers.value_counts().reset_index()
     freq.columns = ['B Number','Count']
@@ -383,9 +383,7 @@ def generate_orange_report(df):
 
     calls_df = freq.merge(
         base_info,
-        left_on='B Number',
-        right_on='OTHER_MSISDN',
-        how='left'
+        left_on='B Number', right_on='OTHER_MSISDN', how='left'
     )
 
     sms_count = (
@@ -396,15 +394,13 @@ def generate_orange_report(df):
     )
 
     calls_df = calls_df.merge(
-        sms_count,
-        left_on='B Number',
-        right_on='OTHER_MSISDN',
-        how='left'
+        sms_count, left_on='B Number', right_on='OTHER_MSISDN', how='left'
     )
 
     calls_df['SMS'] = calls_df['SMS'].fillna(0).astype(int)
     calls_df['Count'] = calls_df['Count'].astype(int)
 
+    calls_df['B Number'] = calls_df['B Number'].astype(str)
     calls_df['B Number id'] = calls_df['OTHER_ID'].apply(
         lambda x: str(int(x)) if pd.notna(x) else ''
     )
@@ -419,8 +415,8 @@ def generate_orange_report(df):
         'B Number id','other site','SMS'
     ]
 
+    # ===== First / Last Call =====
     df['EVENT_START_TIME'] = pd.to_datetime(df['EVENT_START_TIME'], errors='coerce')
-
     call_dates = (
         df.groupby('OTHER_MSISDN')['EVENT_START_TIME']
         .agg(First_Call='min', Last_Call='max')
@@ -428,18 +424,15 @@ def generate_orange_report(df):
     )
 
     calls_df = calls_df.merge(
-        call_dates,
-        left_on='B Number',
-        right_on='OTHER_MSISDN',
-        how='left'
+        call_dates, left_on='B Number', right_on='OTHER_MSISDN', how='left'
     ).drop(columns='OTHER_MSISDN')
 
     calls_df = calls_df.sort_values(by='Count', ascending=False)
 
-    df['TARGET_IMEI'] = df['TARGET_IMEI'].apply(
-        lambda x: str(int(x)) if pd.notna(x) else ''
-    )
-
+    # ======================
+    # IMEI (كما هو)
+    # ======================
+    df['TARGET_IMEI'] = df['TARGET_IMEI'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
     imei_group = df.groupby('TARGET_IMEI').agg(
         Count=('TARGET_IMEI','count'),
         TARGET_IMEI_TYPE=('TARGET_IMEI_TYPE','first'),
@@ -466,6 +459,9 @@ def generate_orange_report(df):
     imei_group['Count'] = imei_group['Count'].astype(int)
     imei_group = imei_group.sort_values(by='Count', ascending=False)
 
+    # ======================
+    # site (كما هو)
+    # ======================
     site_df = df.groupby('CELL_ADDRESS').agg(
         Count=('CELL_ADDRESS','count'),
         First_Use_Date=('EVENT_START_TIME','min'),
@@ -483,8 +479,10 @@ def generate_orange_report(df):
     site_df = site_df[['CELL_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
     site_df = site_df.sort_values(by='Count', ascending=False)
 
+    # ======================
+    # Excel
+    # ======================
     output = BytesIO()
-
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         calls_df.to_excel(writer, sheet_name="calls", index=False)
         imei_group.to_excel(writer, sheet_name="imei", index=False)
@@ -494,13 +492,10 @@ def generate_orange_report(df):
     output.seek(0)
     return format_excel_sheets(output, header_color="FF6600", company="orange")
 
-
 # ================== أزرار التحليل ==================
 if current_df is not None:
     st.subheader("توليد تقارير")
-
     col1, col2, col3 = st.columns(3)
-
     with col1:
         if st.button("تقرير اتصالات"):
             output = generate_etisalat_report(current_df, original_df)
@@ -511,7 +506,6 @@ if current_df is not None:
                     file_name="etisalat_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
     with col2:
         if st.button("تقرير فودافون"):
             output = generate_vodafone_report(current_df)
@@ -522,7 +516,6 @@ if current_df is not None:
                     file_name="vodafone_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
     with col3:
         if st.button("تقرير أورانج"):
             output = generate_orange_report(current_df)
