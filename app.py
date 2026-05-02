@@ -203,23 +203,13 @@ def generate_etisalat_report(df, original_df):
 
         mask = df_final['B Number'] == top_number
 
-        df_final.loc[mask, [
-            'B Full Name',
-            'B Address',
-            'B_NUMBER_SITE_ADDRESS',
-            'Latitude',
-            'Longitude',
-            'Map',
-            'SMS'
-        ]] = [
-            f"{df.iloc[0].get('A_Number_Details_First_Name','')} {df.iloc[0].get('A_Number_Details_Last_Name','')}",
-            df.iloc[0].get('MU_Site_Address',''),
-            df.iloc[0].get('B_Number_MU_Site_Address',''),
-            '',
-            '',
-            '',
-            0
-        ]
+        df_final.loc[mask, 'B Full Name'] = f"{df.iloc[0].get('A_Number_Details_First_Name','')} {df.iloc[0].get('A_Number_Details_Last_Name','')}"
+df_final.loc[mask, 'B Address'] = df.iloc[0].get('MU_Site_Address','')
+df_final.loc[mask, 'B_NUMBER_SITE_ADDRESS'] = df.iloc[0].get('B_Number_MU_Site_Address','')
+df_final.loc[mask, 'Latitude'] = ''
+df_final.loc[mask, 'Longitude'] = ''
+df_final.loc[mask, 'Map'] = ''
+df_final.loc[mask, 'SMS'] = 0
 
     # ================= IMEI =================
     def safe_imei(x):
