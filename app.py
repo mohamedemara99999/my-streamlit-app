@@ -7,8 +7,6 @@ from io import BytesIO
 # ================== تسجيل الدخول ==================
 USERS = {
     "admin": "m7md3mara2025",
-    "user1": "mostafatalaat",
-    "user2": "mohamedelmasry",
     "user3": "2468"
 }
 
