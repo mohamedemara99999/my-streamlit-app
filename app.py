@@ -239,46 +239,75 @@ def generate_etisalat_report(df, original_df):
 # ================== تقرير فودافون ==================
 def generate_vodafone_report(df):
     required_cols = [
-        'B_NUMBER','B_NUMBER_FIRST_NAME','B_NUMBER_LAST_NAME','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS',
-        'B_NUMBER_NATIONAL_ID','IMEI','HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME',
+        'B_NUMBER','B_NUMBER_FIRST_NAME','B_NUMBER_LAST_NAME','B_NUMBER_ADDRESS',
+        'B_NUMBER_SITE_ADDRESS','B_NUMBER_NATIONAL_ID','IMEI',
+        'HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME',
         'FULL_DATE','SITE_ADDRESS','LATITUDE','LONGITUDE','SERVICE'
     ]
+
     for col in required_cols:
         if col not in df.columns:
             st.error(f"العمود {col} غير موجود في الملف")
             return None
 
     df2 = df.copy()
-    df2['B Full Name'] = df2['B_NUMBER_FIRST_NAME'].fillna('') + ' ' + df2['B_NUMBER_LAST_NAME'].fillna('')
-    df2['IMEI'] = df2['IMEI'].astype(str)
-    numbers = df2['B_NUMBER'].astype(str)
-    freq = numbers.value_counts().reset_index()
+
+    # ================= تنظيف مهم =================
+    df2['B_NUMBER'] = df2['B_NUMBER'].fillna('').astype(str)
+    df2['IMEI'] = df2['IMEI'].fillna('').astype(str)
+    df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'], errors='coerce')
+
+    # ================= COUNT =================
+    freq = df2['B_NUMBER'].value_counts().reset_index()
     freq.columns = ['B Number','Count']
 
-    # ===== حساب SMS =====
-    sms_count = df2[df2['SERVICE'].astype(str).str.strip().isin(["Short message MO/PP","Short message MT/PP"])].groupby('B_NUMBER').size().reset_index(name='SMS')
+    # ================= SMS =================
+    sms_count = df2[
+        df2['SERVICE'].astype(str).str.strip().isin(["Short message MO/PP","Short message MT/PP"])
+    ].groupby('B_NUMBER').size().reset_index(name='SMS')
 
-    # ===== دمج البيانات =====
-    df_final = freq.merge(
-        df2[['B_NUMBER','B Full Name','B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','B_NUMBER_NATIONAL_ID']].drop_duplicates(subset='B_NUMBER'),
-        left_on='B Number', right_on='B_NUMBER', how='left'
-    )
+    # ================= Base Info =================
+    base_info = df2[[
+        'B_NUMBER',
+        'B_NUMBER_FIRST_NAME',
+        'B_NUMBER_LAST_NAME',
+        'B_NUMBER_ADDRESS',
+        'B_NUMBER_SITE_ADDRESS',
+        'B_NUMBER_NATIONAL_ID'
+    ]].drop_duplicates(subset='B_NUMBER')
+
+    base_info['B Full Name'] = (
+        base_info['B_NUMBER_FIRST_NAME'].fillna('') + ' ' +
+        base_info['B_NUMBER_LAST_NAME'].fillna('')
+    ).str.strip()
+
+    # ================= Merge =================
+    df_final = freq.merge(base_info, left_on='B Number', right_on='B_NUMBER', how='left')
     df_final = df_final.merge(sms_count, left_on='B Number', right_on='B_NUMBER', how='left')
-    df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
 
-    # ===== أول وآخر مكالمة =====
-    df2['FULL_DATE'] = pd.to_datetime(df2['FULL_DATE'])
-    call_dates = df2.groupby('B_NUMBER')['FULL_DATE'].agg(First_Call='min', Last_Call='max').reset_index()
+    df_final['SMS'] = df_final['SMS'].fillna(0).astype(int)
+    df_final['Count'] = df_final['Count'].astype(int)
+
+    df_final['B Number Id'] = df_final['B_NUMBER_NATIONAL_ID'].fillna('').astype(str)
+
+    # ================= First / Last Call =================
+    call_dates = df2.groupby('B_NUMBER')['FULL_DATE'].agg(
+        First_Call='min',
+        Last_Call='max'
+    ).reset_index()
+
     df_final = df_final.merge(call_dates, left_on='B Number', right_on='B_NUMBER', how='left')
 
-    df_final['B Number id'] = df_final['B_NUMBER_NATIONAL_ID'].astype(str)
-    df_final = df_final[['B Number','Count','B Full Name','B Number id',
-                         'B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS','SMS',
-                         'First_Call','Last_Call']]
-    df_final['Count'] = df_final['Count'].astype(int)
+    # ================= Final Columns =================
+    df_final = df_final[[
+        'B Number','Count','B Full Name','B Number Id',
+        'B_NUMBER_ADDRESS','B_NUMBER_SITE_ADDRESS',
+        'SMS','First_Call','Last_Call'
+    ]]
+
     df_final = df_final.sort_values(by='Count', ascending=False)
 
-    # ===== IMEI =====
+    # ================= IMEI =================
     imei_group = df2.groupby('IMEI').agg(
         Count=('IMEI','count'),
         Device_Info=('IMEI', lambda x: f'https://www.imei.info/calc/?imei={x.iloc[0]}'),
@@ -288,33 +317,39 @@ def generate_vodafone_report(df):
         Last_Use_Date=('FULL_DATE','max')
     ).reset_index()
 
+    imei_group['Count'] = imei_group['Count'].astype(int)
+
     first_last_addr = []
     for imei in imei_group['IMEI']:
-        sub = df2[df2['IMEI']==imei].sort_values('FULL_DATE')
-        first_addr = sub.iloc[0]['SITE_ADDRESS']
-        last_addr = sub.iloc[-1]['SITE_ADDRESS']
-        first_last_addr.append((first_addr,last_addr))
+        sub = df2[df2['IMEI'] == imei].sort_values('FULL_DATE')
+        if len(sub) > 0:
+            first_last_addr.append((sub.iloc[0]['SITE_ADDRESS'], sub.iloc[-1]['SITE_ADDRESS']))
+        else:
+            first_last_addr.append(('', ''))
+
     imei_group['First_Use_Address'] = [x[0] for x in first_last_addr]
     imei_group['Last_Use_Address'] = [x[1] for x in first_last_addr]
 
-    imei_group = imei_group[['IMEI','Count','Device_Info','HANDSET_MANUFACTURER','HANDSET_MARKETING_NAME',
-                             'First_Use_Date','Last_Use_Date','First_Use_Address','Last_Use_Address']]
-    imei_group['Count'] = imei_group['Count'].astype(int)
     imei_group = imei_group.sort_values(by='Count', ascending=False)
 
-    # ===== Sites =====
-    site_df = df2[['SITE_ADDRESS','LATITUDE','LONGITUDE','FULL_DATE']].copy()
-    site_group = site_df.groupby('SITE_ADDRESS').agg(
+    # ================= SITE =================
+    site_group = df2.groupby('SITE_ADDRESS').agg(
         Count=('SITE_ADDRESS','count'),
-        Map=('LATITUDE', lambda x: f'https://www.google.com/maps/search/?api=1&query={x.iloc[0]},{site_df.loc[x.index[0],"LONGITUDE"]}'),
         First_Use_Date=('FULL_DATE','min'),
-        Last_Use_Date=('FULL_DATE','max')
+        Last_Use_Date=('FULL_DATE','max'),
+        Latitude=('LATITUDE','first'),
+        Longitude=('LONGITUDE','first')
     ).reset_index()
-    site_group['Count'] = site_group['Count'].astype(int)
-    site_group = site_group.sort_values(by='Count', ascending=False)
-    site_group = site_group[['SITE_ADDRESS','Count','Map','First_Use_Date','Last_Use_Date']]
 
-    # ===== حفظ Excel =====
+    site_group['Map'] = site_group.apply(
+        lambda r: f'https://www.google.com/maps/search/?api=1&query={r["Latitude"]},{r["Longitude"]}'
+        if pd.notna(r["Latitude"]) and pd.notna(r["Longitude"]) else '',
+        axis=1
+    )
+
+    site_group = site_group.sort_values(by='Count', ascending=False)
+
+    # ================= EXPORT =================
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_final.to_excel(writer, sheet_name="calls", index=False)
@@ -323,8 +358,7 @@ def generate_vodafone_report(df):
         df.to_excel(writer, sheet_name="cheet", index=False)
 
     output.seek(0)
-    final_output = format_excel_sheets(output, header_color="FF0000", company="vodafone")
-    return final_output
+    return format_excel_sheets(output, header_color="FF0000", company="vodafone")
 
 # ================== تقرير أورانج ==================
 def generate_orange_report(df):
