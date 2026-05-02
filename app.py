@@ -491,7 +491,182 @@ def generate_orange_report(df):
 
     output.seek(0)
     return format_excel_sheets(output, header_color="FF6600", company="orange")
+# ================== تقرير اتصالات شركه ==================
+def generate_etisalat_company_report(df):
 
+    required_cols = [
+        'Subscriber_Number',
+        'Call_Start_Date',
+        'Call_Start_Time',
+        'Service',
+        'Traffic_Direction',
+        'Duration',
+        'Subscriber_IMEI',
+        'Subscriber_Location',
+        'Subscriber_Location_Address',
+        'b_number_full',
+        'B_Number_Full_Name',
+        'B_Number_Address',
+        'B_Number_NID',
+        'B_Number_Most_Location',
+        'B_Num_Most_Location_Address'
+    ]
+
+    for col in required_cols:
+        if col not in df.columns:
+            st.error(f"العمود {col} غير موجود في الملف")
+            return None
+
+    df = df.copy()
+
+    # ================= CALLS =================
+    numbers = df['b_number_full'].astype(str)
+    freq = numbers.value_counts().reset_index()
+    freq.columns = ['B Number', 'Count']
+
+    base_info = df[
+        [
+            'b_number_full',
+            'B_Number_Full_Name',
+            'B_Number_Address',
+            'B_Number_NID',
+            'B_Num_Most_Location_Address'
+        ]
+    ].drop_duplicates(subset='b_number_full')
+
+    calls_df = freq.merge(
+        base_info,
+        left_on='B Number',
+        right_on='b_number_full',
+        how='left'
+    )
+
+    sms_count = (
+        df[df['Service'].astype(str).str.contains("SMS", case=False, na=False)]
+        .groupby('b_number_full')
+        .size()
+        .reset_index(name='SMS')
+    )
+
+    calls_df = calls_df.merge(
+        sms_count,
+        left_on='B Number',
+        right_on='b_number_full',
+        how='left'
+    )
+
+    calls_df['SMS'] = calls_df['SMS'].fillna(0).astype(int)
+    calls_df['Count'] = calls_df['Count'].astype(int)
+
+    df['FULL_DATE'] = pd.to_datetime(
+        df['Call_Start_Date'].astype(str) + " " + df['Call_Start_Time'].astype(str),
+        errors='coerce'
+    )
+
+    call_dates = (
+        df.groupby('b_number_full')['FULL_DATE']
+        .agg(First_Call='min', Last_Call='max')
+        .reset_index()
+    )
+
+    calls_df = calls_df.merge(
+        call_dates,
+        left_on='B Number',
+        right_on='b_number_full',
+        how='left'
+    )
+
+    calls_df = calls_df[
+        [
+            'B Number',
+            'Count',
+            'B_Number_Full_Name',
+            'B_Number_Address',
+            'B_Number_NID',
+            'B_Num_Most_Location_Address',
+            'SMS',
+            'First_Call',
+            'Last_Call'
+        ]
+    ]
+
+    calls_df.columns = [
+        'B Number',
+        'Count',
+        'B Full Name',
+        'B Address',
+        'B Number ID',
+        'Other Site',
+        'SMS',
+        'First_Call',
+        'Last_Call'
+    ]
+
+    calls_df = calls_df.sort_values(by='Count', ascending=False)
+
+    # ================= IMEI =================
+    df['Subscriber_IMEI'] = df['Subscriber_IMEI'].astype(str)
+
+    imei_group = df.groupby('Subscriber_IMEI').agg(
+        Count=('Subscriber_IMEI', 'count'),
+        First_Use_Date=('FULL_DATE', 'min'),
+        Last_Use_Date=('FULL_DATE', 'max'),
+        First_Use_Address=('Subscriber_Location_Address', 'first'),
+        Last_Use_Address=('Subscriber_Location_Address', 'last')
+    ).reset_index()
+
+    imei_group['Device Info'] = imei_group['Subscriber_IMEI'].apply(
+        lambda x: f'https://www.imei.info/calc/?imei={x}'
+    )
+
+    imei_group.columns = [
+        'IMEI',
+        'Count',
+        'First_Use_Date',
+        'Last_Use_Date',
+        'First_Use_Address',
+        'Last_Use_Address',
+        'Device Info'
+    ]
+
+    # ================= SITE =================
+    site_df = df.groupby('Subscriber_Location_Address').agg(
+        Count=('Subscriber_Location_Address', 'count'),
+        First_Use_Date=('FULL_DATE', 'min'),
+        Last_Use_Date=('FULL_DATE', 'max')
+    ).reset_index()
+
+    site_df['Map'] = ''
+
+    site_df = site_df[
+        [
+            'Subscriber_Location_Address',
+            'Count',
+            'Map',
+            'First_Use_Date',
+            'Last_Use_Date'
+        ]
+    ]
+
+    site_df.columns = [
+        'SITE_ADDRESS',
+        'Count',
+        'Map',
+        'First_Use_Date',
+        'Last_Use_Date'
+    ]
+
+    # ================= Excel =================
+    output = BytesIO()
+
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        calls_df.to_excel(writer, sheet_name="calls", index=False)
+        imei_group.to_excel(writer, sheet_name="imei", index=False)
+        site_df.to_excel(writer, sheet_name="site", index=False)
+        df.to_excel(writer, sheet_name="cheet", index=False)
+
+    output.seek(0)
+    return format_excel_sheets(output, header_color="90EE90", company="etisalat_company")
 # ================== أزرار التحليل ==================
 if current_df is not None:
     st.subheader("توليد تقارير")
