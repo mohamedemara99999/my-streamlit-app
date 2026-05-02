@@ -198,7 +198,7 @@ def generate_etisalat_report(df, original_df):
             'Map'
         ]
   
-       for col in cols_to_fix:
+        for col in cols_to_fix:
            df_final[col] = df_final[col].astype("object")
 
     # تعيين القيم عمود عمود
