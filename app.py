@@ -670,7 +670,9 @@ def generate_etisalat_company_report(df):
 # ================== أزرار التحليل ==================
 if current_df is not None:
     st.subheader("توليد تقارير")
-    col1, col2, col3 = st.columns(3)
+
+    col1, col2, col3, col4 = st.columns(4)
+
     with col1:
         if st.button("تقرير اتصالات"):
             output = generate_etisalat_report(current_df, original_df)
@@ -681,7 +683,19 @@ if current_df is not None:
                     file_name="etisalat_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+
     with col2:
+        if st.button("اتصالات شركه"):
+            output = generate_etisalat_company_report(current_df)
+            if output:
+                st.download_button(
+                    label="تحميل اتصالات شركه",
+                    data=output,
+                    file_name="etisalat_company_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+    with col3:
         if st.button("تقرير فودافون"):
             output = generate_vodafone_report(current_df)
             if output:
@@ -691,7 +705,8 @@ if current_df is not None:
                     file_name="vodafone_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-    with col3:
+
+    with col4:
         if st.button("تقرير أورانج"):
             output = generate_orange_report(current_df)
             if output:
@@ -701,8 +716,6 @@ if current_df is not None:
                     file_name="orange_report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
-
 
 
 
