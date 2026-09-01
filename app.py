@@ -434,7 +434,7 @@ def generate_orange_report(df):
     calls_df['Count'] = calls_df['Count'].astype(int)
 
     calls_df['B Number id'] = calls_df['OTHER_ID'].apply(
-        lambda x: str(int(x)) if pd.notna(x) else ''
+        lambda x: str(int(x)) if pd.notna(x) and str(x).replace('.', '', 1).isdigit() else str(x) if pd.notna(x) else ''
     )
 
     calls_df = calls_df[
