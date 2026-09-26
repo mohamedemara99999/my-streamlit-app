@@ -44,7 +44,13 @@ if st.session_state.logged_in:
 
     selected_company = st.selectbox(
         "اختر الشركة",
-        ["etisalat_معمل", "etisalat_شركه", "vodafone", "orange"]
+        [
+        "etisalat_معمل",
+        "etisalat_شركه",
+        "vodafone_شركه",
+        "vodafone_معمل",
+        "orange"
+    ]
 
     )
 
@@ -70,7 +76,7 @@ if st.session_state.logged_in:
             current_df = current_df.dropna(how='all', axis=1)
 
             # ===== تحقق من الأعمدة =====
-            if selected_company == "etisalat" and 'Originating_Number' not in current_df.columns:
+            if selected_company == "etisalat_معمل" and 'Originating_Number' not in current_df.columns:
                 st.error("ملف غير صالح لاتصالات")
             else:
                 st.success("تم فتح الملف بنجاح")
@@ -383,6 +389,308 @@ def generate_vodafone_report(df):
     return format_excel_sheets(output, header_color="FF0000", company="vodafone")
 
 
+# ================== تقرير فودافون معمل ==================
+def generate_vodafone_lab_report(df):
+    required_cols = [
+        'MOBILE_NUMBER',
+        'CALLED_NUMBER',
+        'TIME_OF_CALL',
+        'SITE_NAME',
+        'SITE_LAT',
+        'SITE_LONG',
+        'EDISTRICT',
+        'SERVICE_TYPE',
+        'IMEI',
+        'CALLED_NAME',
+        'ADDRESS',
+        'NATIONAL_ID',
+        'B_LOCATION'
+    ]
+
+    for col in required_cols:
+        if col not in df.columns:
+            st.error(f"العمود {col} غير موجود في ملف فودافون معمل")
+            return None
+
+    df2 = df.copy()
+
+    # ================= تنظيف البيانات =================
+    df2['MOBILE_NUMBER'] = df2['MOBILE_NUMBER'].astype(str).str.strip()
+    df2['CALLED_NUMBER'] = df2['CALLED_NUMBER'].astype(str).str.strip()
+    df2['IMEI'] = df2['IMEI'].astype(str).str.strip()
+
+    # TIME_OF_CALL جاهز بالفعل
+    df2['TIME_OF_CALL'] = pd.to_datetime(
+        df2['TIME_OF_CALL'],
+        errors='coerce'
+    )
+
+    # ================= Calls =================
+    freq = df2['CALLED_NUMBER'].value_counts().reset_index()
+    freq.columns = ['B Number', 'Count']
+
+    # بيانات الرقم
+    base_info = (
+        df2[
+            [
+                'CALLED_NUMBER',
+                'CALLED_NAME',
+                'ADDRESS',
+                'NATIONAL_ID',
+                'B_LOCATION'
+            ]
+        ]
+        .drop_duplicates(subset='CALLED_NUMBER')
+    )
+
+    calls_df = freq.merge(
+        base_info,
+        left_on='B Number',
+        right_on='CALLED_NUMBER',
+        how='left'
+    )
+
+    # ================= SMS =================
+    sms_count = (
+        df2[
+            df2['SERVICE_TYPE']
+            .astype(str)
+            .str.strip()
+            .str.upper()
+            .eq('SMS')
+        ]
+        .groupby('CALLED_NUMBER')
+        .size()
+        .reset_index(name='SMS')
+    )
+
+    calls_df = calls_df.merge(
+        sms_count,
+        left_on='B Number',
+        right_on='CALLED_NUMBER',
+        how='left'
+    )
+
+    calls_df['SMS'] = calls_df['SMS'].fillna(0).astype(int)
+    calls_df['Count'] = calls_df['Count'].astype(int)
+
+    # ================= First / Last Call =================
+    call_dates = (
+        df2.groupby('CALLED_NUMBER')['TIME_OF_CALL']
+        .agg(
+            First_Call='min',
+            Last_Call='max'
+        )
+        .reset_index()
+    )
+
+    calls_df = calls_df.merge(
+        call_dates,
+        left_on='B Number',
+        right_on='CALLED_NUMBER',
+        how='left'
+    )
+
+    calls_df['B Number Id'] = (
+        calls_df['NATIONAL_ID']
+        .fillna('')
+        .astype(str)
+    )
+
+    calls_df = calls_df[
+        [
+            'B Number',
+            'Count',
+            'CALLED_NAME',
+            'ADDRESS',
+            'B Number Id',
+            'B_LOCATION',
+            'SMS',
+            'First_Call',
+            'Last_Call'
+        ]
+    ]
+
+    calls_df.columns = [
+        'B Number',
+        'Count',
+        'B Full Name',
+        'B Address',
+        'B Number Id',
+        'B_NUMBER_SITE_ADDRESS',
+        'SMS',
+        'First_Call',
+        'Last_Call'
+    ]
+
+    calls_df = calls_df.sort_values(
+        by='Count',
+        ascending=False
+    )
+
+    # ================= IMEI =================
+    def safe_imei(x):
+        try:
+            if pd.isna(x):
+                return ''
+            return str(int(float(x)))
+        except:
+            return str(x).strip()
+
+    df2['IMEI'] = df2['IMEI'].apply(safe_imei)
+
+    imei_group = df2.groupby('IMEI').agg(
+        Count=('IMEI', 'count'),
+        First_Use_Date=('TIME_OF_CALL', 'min'),
+        Last_Use_Date=('TIME_OF_CALL', 'max')
+    ).reset_index()
+
+    # أول وآخر Site Address لكل IMEI
+    first_last_addr = []
+
+    for imei in imei_group['IMEI']:
+        sub = df2[
+            df2['IMEI'] == imei
+        ].sort_values('TIME_OF_CALL')
+
+        if not sub.empty:
+            first_last_addr.append(
+                (
+                    sub.iloc[0]['EDISTRICT'],
+                    sub.iloc[-1]['EDISTRICT']
+                )
+            )
+        else:
+            first_last_addr.append(('', ''))
+
+    imei_group['First_Use_Address'] = [
+        x[0] for x in first_last_addr
+    ]
+
+    imei_group['Last_Use_Address'] = [
+        x[1] for x in first_last_addr
+    ]
+
+    imei_group['Device Info'] = imei_group['IMEI'].apply(
+        lambda x: (
+            f'https://www.imei.info/calc/?imei={x}'
+            if x else ''
+        )
+    )
+
+    imei_group = imei_group[
+        [
+            'IMEI',
+            'Count',
+            'Device Info',
+            'First_Use_Date',
+            'Last_Use_Date',
+            'First_Use_Address',
+            'Last_Use_Address'
+        ]
+    ]
+
+    imei_group['Count'] = imei_group['Count'].astype(int)
+
+    imei_group = imei_group.sort_values(
+        by='Count',
+        ascending=False
+    )
+
+    # ================= Site =================
+    site_df = df2[
+        [
+            'EDISTRICT',
+            'SITE_LAT',
+            'SITE_LONG',
+            'TIME_OF_CALL'
+        ]
+    ].copy()
+
+    site_group = site_df.groupby('EDISTRICT').agg(
+        Count=('EDISTRICT', 'count'),
+        First_Use_Date=('TIME_OF_CALL', 'min'),
+        Last_Use_Date=('TIME_OF_CALL', 'max'),
+        LAT=('SITE_LAT', 'first'),
+        LON=('SITE_LONG', 'first')
+    ).reset_index()
+
+    site_group['Map'] = site_group.apply(
+        lambda r: (
+            f'https://www.google.com/maps/search/?api=1'
+            f'&query={r["LAT"]},{r["LON"]}'
+            if pd.notna(r['LAT']) and pd.notna(r['LON'])
+            else ''
+        ),
+        axis=1
+    )
+
+    site_group = site_group[
+        [
+            'EDISTRICT',
+            'Count',
+            'Map',
+            'First_Use_Date',
+            'Last_Use_Date'
+        ]
+    ]
+
+    site_group.columns = [
+        'SITE_ADDRESS',
+        'Count',
+        'Map',
+        'First_Use_Date',
+        'Last_Use_Date'
+    ]
+
+    site_group['Count'] = site_group['Count'].astype(int)
+
+    site_group = site_group.sort_values(
+        by='Count',
+        ascending=False
+    )
+
+    # ================= Output =================
+    output = BytesIO()
+
+    with pd.ExcelWriter(
+        output,
+        engine='openpyxl'
+    ) as writer:
+
+        calls_df.to_excel(
+            writer,
+            sheet_name='calls',
+            index=False
+        )
+
+        imei_group.to_excel(
+            writer,
+            sheet_name='imei',
+            index=False
+        )
+
+        site_group.to_excel(
+            writer,
+            sheet_name='site',
+            index=False
+        )
+
+        df.to_excel(
+            writer,
+            sheet_name='cheet',
+            index=False
+        )
+
+    output.seek(0)
+
+    return format_excel_sheets(
+        output,
+        header_color="FF6666",
+        company="vodafone_lab"
+    )
+
+
 # ================== تقرير أورانج ==================
 def generate_orange_report(df):
     df.columns = df.columns.str.strip().str.upper()
@@ -629,28 +937,54 @@ def generate_etisalat_company_report(df):
 if current_df is not None:
     st.subheader("توليد تقارير")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
         if st.button("تقرير اتصالات معمل"):
             output = generate_etisalat_report(current_df, original_df)
             if output:
-                st.download_button("تحميل اتصالات", output, "etisalat.xlsx")
+                st.download_button(
+                    "تحميل اتصالات",
+                    output,
+                    "etisalat.xlsx"
+                )
 
     with col2:
         if st.button("تقرير اتصالات شركة"):
             output = generate_etisalat_company_report(current_df)
             if output:
-                st.download_button("تحميل اتصالات شركة", output, "etisalat_company.xlsx")
+                st.download_button(
+                    "تحميل اتصالات شركة",
+                    output,
+                    "etisalat_company.xlsx"
+                )
 
     with col3:
-         if st.button("تقرير فودافون"):
-              output = generate_vodafone_report(current_df)
-              if output:
-                  st.download_button("تحميل فودافون", output, "vodafone.xlsx")
+        if st.button("تقرير فودافون شركه"):
+            output = generate_vodafone_report(current_df)
+            if output:
+                st.download_button(
+                    "تحميل فودافون شركه",
+                    output,
+                    "vodafone_company.xlsx"
+                )
 
     with col4:
+        if st.button("تقرير فودافون معمل"):
+            output = generate_vodafone_lab_report(current_df)
+            if output:
+                st.download_button(
+                    "تحميل فودافون معمل",
+                    output,
+                    "vodafone_lab.xlsx"
+                )
+
+    with col5:
         if st.button("تقرير أورانج"):
-              output = generate_orange_report(current_df)
-              if output:
-                  st.download_button("تحميل أورانج", output, "orange.xlsx")
+            output = generate_orange_report(current_df)
+            if output:
+                st.download_button(
+                    "تحميل أورانج",
+                    output,
+                    "orange.xlsx"
+                )
