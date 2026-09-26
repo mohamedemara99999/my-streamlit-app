@@ -7,7 +7,8 @@ from io import BytesIO
 # ================== تسجيل الدخول ==================
 USERS = {
     "admin": "m7md3mara2025",
-    "user3": "2468"
+    "user": "1234",
+    "torky": "01112224247"
 }
 
 if "logged_in" not in st.session_state:
