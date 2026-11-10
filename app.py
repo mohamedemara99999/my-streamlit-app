@@ -402,8 +402,6 @@ def generate_vodafone_lab_report(df):
         'EDISTRICT',
         'SERVICE_TYPE',
         'IMEI',
-        'CALLED_NAME',
-        'ADDRESS',
         'NATIONAL_ID',
         'B_LOCATION'
     ]
@@ -435,8 +433,6 @@ def generate_vodafone_lab_report(df):
         df2[
             [
                 'CALLED_NUMBER',
-                'CALLED_NAME',
-                'ADDRESS',
                 'NATIONAL_ID',
                 'B_LOCATION'
             ]
@@ -453,17 +449,16 @@ def generate_vodafone_lab_report(df):
 
     # ================= SMS =================
     sms_count = (
-        df2[
-            df2['SERVICE_TYPE']
-            .astype(str)
-            .str.strip()
-            .str.upper()
-            .eq('SMS')
-        ]
-        .groupby('CALLED_NUMBER')
-        .size()
-        .reset_index(name='SMS')
-    )
+    df2[
+        df2['SERVICE_TYPE']
+        .astype(str)
+        .str.strip()
+        .eq('Short message MO/PP')
+    ]
+    .groupby('CALLED_NUMBER')
+    .size()
+    .reset_index(name='SMS')
+)
 
     calls_df = calls_df.merge(
         sms_count,
@@ -502,8 +497,6 @@ def generate_vodafone_lab_report(df):
         [
             'B Number',
             'Count',
-            'CALLED_NAME',
-            'ADDRESS',
             'B Number Id',
             'B_LOCATION',
             'SMS',
@@ -515,8 +508,6 @@ def generate_vodafone_lab_report(df):
     calls_df.columns = [
         'B Number',
         'Count',
-        'B Full Name',
-        'B Address',
         'B Number Id',
         'B_NUMBER_SITE_ADDRESS',
         'SMS',
